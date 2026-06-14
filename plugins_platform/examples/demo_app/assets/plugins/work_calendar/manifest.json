@@ -11,7 +11,7 @@
     "runtime": "quickjs",
     "bundle": "dist/bundle.js",
     "bundleHash": "",
-    "bundleSize": 12904,
+    "bundleSize": 21128,
     "entryFunction": "onActivate",
     "memoryLimitMb": 16,
     "executionTimeoutMs": 5000,

@@ -1,16 +1,18 @@
 import { calendarState } from '../../state/calendar_state.js';
 import { countWeekTasks, getEventsForDate, meetingHoursForDate } from '../../services/calendar_service.js';
+import { t } from '../../i18n.js';
 import { text, sizedBox } from '../tokens.js';
 
 export function statsPanel() {
+  const todayCount = getEventsForDate(calendarState.events, new Date()).length;
   return {
     type: 'row',
     children: [
-      statCard('今日', getEventsForDate(calendarState.events, new Date()).length + '项', '#2563EB'),
+      statCard(t('calendar.today'), todayCount + t('calendar.itemUnit'), '#2563EB'),
       sizedBox(8, 0),
-      statCard('本周待办', String(countWeekTasks(calendarState.events)), '#16A34A'),
+      statCard(t('calendar.weekTasks'), String(countWeekTasks(calendarState.events)), '#16A34A'),
       sizedBox(8, 0),
-      statCard('会议时长', meetingHoursForDate(calendarState.events, new Date()) + 'h', '#EA580C')
+      statCard(t('calendar.meetingHours'), meetingHoursForDate(calendarState.events, new Date()) + 'h', '#EA580C')
     ]
   };
 }

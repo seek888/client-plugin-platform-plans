@@ -2,6 +2,7 @@ import { calendarState } from '../state/calendar_state.js';
 import { showToast } from '../services/host_api.js';
 import { parseDate } from '../utils/date.js';
 import { renderCalendarPage } from '../ui/pages/calendar_page.js';
+import { t, toggleLocale } from '../i18n.js';
 
 export function handleGoToday() {
   calendarState.currentDate = new Date();
@@ -43,14 +44,23 @@ export function handleCreateEvent() {
   calendarState.events.push({
     id,
     title: '新建跟进事项',
+    titleKey: 'event.newTask.title',
     type: 'task',
     startTime: new Date(base.getFullYear(), base.getMonth(), base.getDate(), 17, 0, 0).toISOString(),
     endTime: new Date(base.getFullYear(), base.getMonth(), base.getDate(), 18, 0, 0).toISOString(),
     location: '待确认',
+    locationKey: 'event.newTask.location',
     attendees: ['我'],
-    notes: '从插件快速创建的临时事项'
+    attendeeKeys: ['event.currentUser'],
+    notes: '从插件快速创建的临时事项',
+    notesKey: 'event.newTask.notes'
   });
-  showToast('已创建新日程');
+  showToast(t('calendar.toastCreated'));
+  return fullUpdate();
+}
+
+export function handleToggleLocale() {
+  toggleLocale();
   return fullUpdate();
 }
 

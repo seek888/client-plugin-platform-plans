@@ -1,10 +1,11 @@
 import { calendarState } from '../../state/calendar_state.js';
 import { getEventsForDate } from '../../services/calendar_service.js';
 import { formatDate, sameDay } from '../../utils/date.js';
+import { getEventText, getWeekdayNames } from '../../i18n.js';
 import { text } from '../tokens.js';
 
 export function weekdayHeader() {
-  const names = ['日', '一', '二', '三', '四', '五', '六'];
+  const names = getWeekdayNames();
   return {
     type: 'row',
     children: names.map(name => ({
@@ -78,7 +79,7 @@ function eventDot(evt) {
       margin: '2,0,0,0'
     },
     children: [
-      text(evt.title, 9, '#FFFFFF', '500', 'center')
+      text(getEventText(evt, 'title'), 9, '#FFFFFF', '500', 'center')
     ]
   };
 }

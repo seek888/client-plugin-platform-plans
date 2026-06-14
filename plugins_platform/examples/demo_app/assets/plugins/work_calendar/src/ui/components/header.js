@@ -1,3 +1,4 @@
+import { formatMonthLabel, t } from '../../i18n.js';
 import { text } from '../tokens.js';
 
 export function header(year, month) {
@@ -10,7 +11,13 @@ export function header(year, month) {
         children: [
           {
             type: 'expanded',
-            children: [text('工作日历', 22, '#111827', '700')]
+            children: [text(t('plugin.name'), 22, '#111827', '700')]
+          },
+          {
+            type: 'button',
+            props: { text: t('language.switch') },
+            style: { margin: '0,6,0,0' },
+            events: { onTap: 'handleToggleLocale' }
           },
           {
             type: 'iconButton',
@@ -35,7 +42,7 @@ export function header(year, month) {
           {
             type: 'expanded',
             children: [
-              text(year + '年' + month + '月', 18, '#1F2937', '700', 'center')
+              text(formatMonthLabel(year, month), 18, '#1F2937', '700', 'center')
             ]
           },
           {

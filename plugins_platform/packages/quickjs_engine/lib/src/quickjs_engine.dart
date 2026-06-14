@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 
 import 'package:core/core.dart';
 import 'package:quickjs_engine/quickjs_engine.dart' as quickjs;
@@ -68,7 +67,6 @@ class QuickJSRuntime implements JSRuntime {
     _runtimeId = 'rt_${DateTime.now().millisecondsSinceEpoch}';
     _state = RuntimeState.loading;
     _jsRuntime = quickjs.QuickJsRuntime2(
-      memoryLimit: Platform.isMacOS ? null : memoryLimitBytes,
       timeout: executionTimeout?.inMilliseconds,
     );
     _installHostBridge();

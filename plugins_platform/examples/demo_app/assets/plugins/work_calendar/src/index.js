@@ -8,7 +8,8 @@ export {
   handleFilter,
   handleGoToday,
   handleNextMonth,
-  handlePreviousMonth
+  handlePreviousMonth,
+  handleToggleLocale
 } from './controllers/calendar_handlers.js';
 
 export function onActivate() {
