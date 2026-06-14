@@ -1,0 +1,63 @@
+name: plugins_platform
+repository: https://github.com/your-org/plugins_platform
+
+# Packages in this project are organized by logical groups.
+packages:
+  - packages/**
+  - examples/**
+
+ignore:
+  - packages/quickjs
+
+# Command configuration
+command:
+  bootstrap:
+    runPubGetInParallel: true
+    hooks:
+      post: melos run format
+
+  version:
+    # Automatically update all package versions in lockstep
+    linkToCommits: true
+
+    # Branch patterns to consider when automatically releasing
+    branchPatterns:
+      - main: null
+      - develop: null
+
+  clean:
+    hooks:
+      post: melos run format
+
+# IDE configuration
+ide:
+  intellij:
+    enabled: false
+  vscode:
+    enabled: true
+
+# Scripts that can be run with `melos run`
+scripts:
+  format:
+    run: dart format . --set-exit-if-changed
+    description: Format Dart code.
+
+  analyze:
+    run: dart analyze . --fatal-infos
+    description: Analyze Dart code.
+
+  test:
+    run: melos run test:unit --no-select
+    description: Run all tests.
+
+  test:unit:
+    run: dart test
+    description: Run unit tests.
+    selectPackage:
+      dirExists:
+        - test
+
+  build:
+    run: |
+      cd examples/demo_app && flutter build apk --debug
+    description: Build demo app.

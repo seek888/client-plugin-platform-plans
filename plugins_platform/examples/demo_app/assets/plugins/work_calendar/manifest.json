@@ -1,0 +1,71 @@
+{
+  "id": "com.company.work_calendar",
+  "name": "工作日历",
+  "description": "集成日程管理、会议安排、审批提醒",
+  "version": "1.0.0",
+  "publisher": "company",
+  "type": "js",
+  "platforms": ["ios", "android", "windows", "macos", "linux"],
+  "minHostVersion": "1.0.0",
+  "engine": {
+    "runtime": "quickjs",
+    "bundle": "dist/bundle.js",
+    "bundleHash": "",
+    "bundleSize": 12904,
+    "entryFunction": "onActivate",
+    "memoryLimitMb": 16,
+    "executionTimeoutMs": 5000,
+    "background": false
+  },
+  "activationEvents": ["onCommand:calendar.open", "onEvent:approval.created"],
+  "permissions": [
+    "storage.local",
+    "toast.show",
+    "dialog.alert",
+    "calendar.read",
+    "calendar.write"
+  ],
+  "capabilities": [
+    {
+      "id": "calendar.event.get",
+      "type": "data",
+      "permissions": ["calendar.read"]
+    },
+    {
+      "id": "calendar.event.create",
+      "type": "action",
+      "permissions": ["calendar.write"]
+    }
+  ],
+  "stac": {
+    "schemaVersion": "1.0",
+    "components": [
+      "text",
+      "button",
+      "container",
+      "row",
+      "column",
+      "gridView",
+      "card",
+      "iconButton",
+      "expanded",
+      "sizedBox"
+    ],
+    "customComponents": []
+  },
+  "performanceBudget": {
+    "startupMs": 800,
+    "firstScreenMs": 1500,
+    "maxMemoryMb": 16,
+    "maxCpuPercent": 10
+  },
+  "updatePolicy": {
+    "channel": "stable",
+    "allowAutoUpdate": true,
+    "allowRollback": true,
+    "allowRemoteConfig": true,
+    "allowRemoteSchema": true,
+    "allowRemoteCode": true,
+    "signatureRequired": false
+  }
+}

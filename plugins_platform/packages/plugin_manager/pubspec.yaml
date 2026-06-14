@@ -1,0 +1,30 @@
+name: plugin_manager
+description: Plugin lifecycle management for the Plugins Platform.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  core:
+    path: ../core
+  host_bridge:
+    path: ../host_bridge
+  plugins_quickjs_engine:
+    path: ../quickjs_engine
+  stac_renderer:
+    path: ../stac_renderer
+  flutter_riverpod: ^2.4.9
+  path_provider: ^2.1.1
+  crypto: ^3.0.3
+  http: ^1.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.6

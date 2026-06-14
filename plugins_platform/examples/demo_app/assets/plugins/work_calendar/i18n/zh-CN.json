@@ -1,0 +1,7 @@
+{
+  "plugin.name": "工作日历",
+  "plugin.description": "集成日程管理、会议安排、审批提醒",
+  "calendar.today": "今日",
+  "calendar.weekTasks": "本周待办",
+  "calendar.meetingHours": "会议时长"
+}

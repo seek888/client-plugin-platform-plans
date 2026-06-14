@@ -1,0 +1,22 @@
+.DS_Store
+
+# Dart / Flutter
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+coverage/
+
+# Native dependency caches
+Pods/
+DerivedData/
+
+# IDE / editor
+.idea/
+.vscode/
+*.iml
+
+# Logs and temporary files
+*.log
+*.tmp

@@ -1,0 +1,26 @@
+name: plugins_platform
+description: Unified export package for the Plugins Platform.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  core:
+    path: ../core
+  plugins_quickjs_engine:
+    path: ../quickjs_engine
+  plugin_manager:
+    path: ../plugin_manager
+  host_bridge:
+    path: ../host_bridge
+  stac_renderer:
+    path: ../stac_renderer
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
