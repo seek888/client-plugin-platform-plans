@@ -2,13 +2,23 @@ import { ensureCalendarData } from './state/calendar_state.js';
 import { renderCalendarPage } from './ui/pages/calendar_page.js';
 import { renderTodayCard } from './ui/cards/today_card.js';
 export {
+  handleApprovalAction,
+  handleChangeReminderMinutes,
   handleCreateEvent,
   handleDateClick,
+  handleDeleteEvent,
+  handleEditorChange,
   handleEventDetail,
   handleFilter,
   handleGoToday,
   handleNextMonth,
+  handlePickContacts,
   handlePreviousMonth,
+  handleSaveEvent,
+  handleSwitchModule,
+  handleTaskAction,
+  handleToggleReminder,
+  handleToggleRepeat,
   handleToggleLocale
 } from './controllers/calendar_handlers.js';
 

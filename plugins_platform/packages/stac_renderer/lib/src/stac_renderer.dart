@@ -524,6 +524,7 @@ Widget _buildTextFormField(
     formKey?.setValue(id, initialValue);
   }
   return TextFormField(
+    key: ValueKey('${id ?? ''}:${initialValue ?? ''}'),
     initialValue: initialValue?.toString(),
     decoration: InputDecoration(
       labelText: props['label']?.toString(),

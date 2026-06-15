@@ -16,8 +16,8 @@
   "engine": {
     "runtime": "quickjs",
     "bundle": "dist/bundle.js",
-    "bundleHash": "337445251b6985fabcc41076ef4340effa30e4f6cfd014b0520c87b3bec774cc",
-    "bundleSize": 31021,
+    "bundleHash": "fb1986f329f3bd21fb44a12fef306ca69c4986c5a0d10303067d2e3088c336d4",
+    "bundleSize": 61252,
     "entryFunction": "onActivate",
     "memoryLimitMb": 16,
     "executionTimeoutMs": 5000,
@@ -32,7 +32,11 @@
     "toast.show",
     "dialog.alert",
     "calendar.read",
-    "calendar.write"
+    "calendar.write",
+    "org.contacts.read",
+    "notification.send",
+    "approval.read",
+    "approval.write"
   ],
   "capabilities": [
     {
@@ -55,6 +59,8 @@
     "components": [
       "text",
       "button",
+      "textFormField",
+      "textarea",
       "container",
       "row",
       "column",

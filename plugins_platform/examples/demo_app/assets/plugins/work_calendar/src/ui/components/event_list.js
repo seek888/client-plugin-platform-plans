@@ -35,12 +35,14 @@ export function eventRow(evt) {
 
   return {
     type: 'container',
+    props: { eventId: evt.id },
     style: {
       backgroundColor: '#F9FAFB',
       borderRadius: 8,
       padding: '10,10,10,10',
       margin: '8,0,0,0'
     },
+    events: { onTap: 'handleEventDetail' },
     children: [
       {
         type: 'row',

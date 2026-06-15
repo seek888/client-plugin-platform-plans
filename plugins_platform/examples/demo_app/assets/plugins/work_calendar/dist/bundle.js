@@ -83,7 +83,31 @@
       locale: 'zh-CN',
       currentDate: new Date(),
       selectedDate: new Date(),
+      selectedEventId: null,
+      editorMode: 'create',
+      editorKey: 'draft_default',
+      activeModule: 'schedule',
       events: [],
+      approvals: [],
+      tasks: [],
+      contacts: [],
+      notifications: [],
+      draft: {
+        id: 'draft_default',
+        title: '新建跟进事项',
+        type: 'task',
+        startTime: '',
+        endTime: '',
+        location: '',
+        attendees: [],
+        attendeeIds: [],
+        notes: '',
+        recurrence: 'none',
+        reminderEnabled: true,
+        reminderMinutes: 15,
+        approvalStatus: 'draft',
+        taskStatus: 'open'
+      },
       categories: {
         meeting: { name: '会议', color: '#2563EB' },
         task: { name: '任务', color: '#16A34A' },
@@ -140,6 +164,53 @@
           ['event.businessTrip.attendee1']
         )
       ];
+    
+      calendarState.approvals = [
+        {
+          id: 'apr_1',
+          title: '合同审批',
+          owner: '法务',
+          status: 'pending',
+          createdAt: new Date(y, m, d - 1, 10, 0, 0).toISOString()
+        },
+        {
+          id: 'apr_2',
+          title: '出差申请',
+          owner: '销售一组',
+          status: 'approved',
+          createdAt: new Date(y, m, d - 2, 15, 0, 0).toISOString()
+        }
+      ];
+    
+      calendarState.tasks = [
+        {
+          id: 'task_1',
+          title: '补充会议纪要',
+          status: 'open',
+          dueAt: new Date(y, m, d + 1, 18, 0, 0).toISOString()
+        },
+        {
+          id: 'task_2',
+          title: '确认审批附件',
+          status: 'doing',
+          dueAt: new Date(y, m, d + 2, 12, 0, 0).toISOString()
+        }
+      ];
+    
+      calendarState.notifications = [
+        {
+          id: 'ntf_1',
+          title: '待审批提醒',
+          read: false
+        }
+      ];
+    
+      if (calendarState.events.length > 0) {
+        calendarState.selectedEventId = calendarState.events[0].id;
+        calendarState.draft = cloneEvent(calendarState.events[0]);
+        calendarState.editorKey = calendarState.draft.id;
+        calendarState.editorMode = 'edit';
+      }
     }
     
     function withI18n(event, titleKey, locationKey, attendeeKeys) {
@@ -150,9 +221,56 @@
         attendeeKeys
       };
     }
+    function cloneEvent(event, fallbackId) {
+      const start = new Date(event.startTime);
+      const end = new Date(event.endTime);
+      const id = fallbackId || event.id || `draft_${Date.now()}`;
+      return {
+        id,
+        title: event.title,
+        titleKey: event.titleKey,
+        type: event.type,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        location: event.location || '',
+        locationKey: event.locationKey,
+        attendees: [...(event.attendees || [])],
+        attendeeKeys: [...(event.attendeeKeys || [])],
+        attendeeIds: [...(event.attendeeIds || [])],
+        notes: event.notes || '',
+        notesKey: event.notesKey,
+        recurrence: event.recurrence || 'none',
+        reminderEnabled: event.reminderEnabled !== false,
+        reminderMinutes: event.reminderMinutes ?? 15,
+        approvalStatus: event.approvalStatus || 'draft',
+        taskStatus: event.taskStatus || 'open'
+      };
+    }
+    function createDraft(baseDate, eventId) {
+      const start = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 9, 0, 0);
+      const end = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 10, 0, 0);
+      return {
+        id: eventId || `draft_${Date.now()}`,
+        title: '新建跟进事项',
+        type: 'task',
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        location: '',
+        attendees: [],
+        attendeeIds: [],
+        notes: '',
+        recurrence: 'none',
+        reminderEnabled: true,
+        reminderMinutes: 15,
+        approvalStatus: 'draft',
+        taskStatus: 'open'
+      };
+    }
     
     exports["calendarState"] = calendarState;
     exports["ensureCalendarData"] = ensureCalendarData;
+    exports["cloneEvent"] = cloneEvent;
+    exports["createDraft"] = createDraft;
   });
 
   define("src/i18n.js", function(module, exports, require) {
@@ -174,6 +292,64 @@
         'calendar.emptyDay': '暂无安排，可点击右上角创建跟进事项。',
         'calendar.location': '地点：{location}',
         'calendar.attendees': '参与人：{attendees}',
+        'calendar.attendeeIds': '联系人ID：{ids}',
+        'calendar.reminderTitle': '提醒：{title}',
+        'calendar.reminderBody': '{time} | {location}',
+        'calendar.locationTbd': '待确认',
+        'calendar.toastEditStart': '已进入编辑模式',
+        'calendar.toastSaved': '日程已保存',
+        'calendar.toastDeleted': '日程已删除',
+        'calendar.todaySchedule': '今日日程',
+        'calendar.editorTitle': '编辑日程',
+        'calendar.editorSubtitle': '创建、修改重复规则、提醒、审批联动与联系人',
+        'calendar.fieldTitle': '标题',
+        'calendar.fieldLocation': '地点',
+        'calendar.fieldStartTime': '开始时间',
+        'calendar.fieldEndTime': '结束时间',
+        'calendar.fieldNotes': '备注',
+        'calendar.save': '保存',
+        'calendar.delete': '删除',
+        'calendar.pickContacts': '选择联系人',
+        'calendar.repeat': '重复规则',
+        'calendar.reminder': '提醒',
+        'calendar.recurrence.none': '不重复',
+        'calendar.recurrence.daily': '每天',
+        'calendar.recurrence.weekly': '每周',
+        'calendar.recurrence.monthly': '每月',
+        'calendar.modules': '模块',
+        'calendar.module.schedule': '日程',
+        'calendar.module.approval': '审批',
+        'calendar.module.task': '任务',
+        'calendar.module.contacts': '联系人',
+        'calendar.module.notifications': '提醒',
+        'approval.title': '审批模块',
+        'approval.empty': '暂无审批事项',
+        'approval.owner': '发起人：{owner}',
+        'approval.status.pending': '待审批',
+        'approval.status.approved': '已通过',
+        'approval.status.rejected': '已拒绝',
+        'approval.approve': '通过',
+        'approval.reject': '拒绝',
+        'approval.toastApproved': '审批已通过',
+        'approval.toastRejected': '审批已拒绝',
+        'task.title': '任务模块',
+        'task.empty': '暂无任务',
+        'task.dueAt': '截止：{time}',
+        'task.status.open': '待办',
+        'task.status.doing': '进行中',
+        'task.status.done': '已完成',
+        'task.start': '开始',
+        'task.finish': '完成',
+        'task.toastUpdated': '任务状态已更新',
+        'contact.title': '联系人',
+        'contact.search': '搜索联系人',
+        'contact.empty': '暂无联系人',
+        'contact.choose': '选中联系人',
+        'contact.department': '部门：{department}',
+        'notification.title': '提醒通知',
+        'notification.empty': '暂无提醒',
+        'notification.read': '已读',
+        'notification.unread': '未读',
         'calendar.futureTitle': '后续可扩展能力',
         'calendar.futureDescription': '创建/编辑日程、重复规则、提醒通知、审批与任务模块联动、联系人选择。',
         'calendar.toastCreated': '已创建新日程',
@@ -223,6 +399,64 @@
         'calendar.emptyDay': 'No events yet. Use the top-right action to create a follow-up.',
         'calendar.location': 'Location: {location}',
         'calendar.attendees': 'Attendees: {attendees}',
+        'calendar.attendeeIds': 'Contact IDs: {ids}',
+        'calendar.reminderTitle': 'Reminder: {title}',
+        'calendar.reminderBody': '{time} | {location}',
+        'calendar.locationTbd': 'TBD',
+        'calendar.toastEditStart': 'Edit mode enabled',
+        'calendar.toastSaved': 'Event saved',
+        'calendar.toastDeleted': 'Event deleted',
+        'calendar.todaySchedule': 'Today',
+        'calendar.editorTitle': 'Edit Event',
+        'calendar.editorSubtitle': 'Create, repeat, remind, approve, and assign contacts',
+        'calendar.fieldTitle': 'Title',
+        'calendar.fieldLocation': 'Location',
+        'calendar.fieldStartTime': 'Start Time',
+        'calendar.fieldEndTime': 'End Time',
+        'calendar.fieldNotes': 'Notes',
+        'calendar.save': 'Save',
+        'calendar.delete': 'Delete',
+        'calendar.pickContacts': 'Pick Contacts',
+        'calendar.repeat': 'Repeat',
+        'calendar.reminder': 'Reminder',
+        'calendar.recurrence.none': 'None',
+        'calendar.recurrence.daily': 'Daily',
+        'calendar.recurrence.weekly': 'Weekly',
+        'calendar.recurrence.monthly': 'Monthly',
+        'calendar.modules': 'Modules',
+        'calendar.module.schedule': 'Schedule',
+        'calendar.module.approval': 'Approval',
+        'calendar.module.task': 'Task',
+        'calendar.module.contacts': 'Contacts',
+        'calendar.module.notifications': 'Reminders',
+        'approval.title': 'Approvals',
+        'approval.empty': 'No approvals yet',
+        'approval.owner': 'Owner: {owner}',
+        'approval.status.pending': 'Pending',
+        'approval.status.approved': 'Approved',
+        'approval.status.rejected': 'Rejected',
+        'approval.approve': 'Approve',
+        'approval.reject': 'Reject',
+        'approval.toastApproved': 'Approval approved',
+        'approval.toastRejected': 'Approval rejected',
+        'task.title': 'Tasks',
+        'task.empty': 'No tasks yet',
+        'task.dueAt': 'Due: {time}',
+        'task.status.open': 'Open',
+        'task.status.doing': 'Doing',
+        'task.status.done': 'Done',
+        'task.start': 'Start',
+        'task.finish': 'Finish',
+        'task.toastUpdated': 'Task updated',
+        'contact.title': 'Contacts',
+        'contact.search': 'Search contacts',
+        'contact.empty': 'No contacts',
+        'contact.choose': 'Selected Contacts',
+        'contact.department': 'Department: {department}',
+        'notification.title': 'Notifications',
+        'notification.empty': 'No notifications',
+        'notification.read': 'Read',
+        'notification.unread': 'Unread',
         'calendar.futureTitle': 'Planned Extensions',
         'calendar.futureDescription': 'Create/edit events, recurrence rules, reminders, approval and task integrations, and contact selection.',
         'calendar.toastCreated': 'New event created',
@@ -584,12 +818,14 @@
     
       return {
         type: 'container',
+        props: { eventId: evt.id },
         style: {
           backgroundColor: '#F9FAFB',
           borderRadius: 8,
           padding: '10,10,10,10',
           margin: '8,0,0,0'
         },
+        events: { onTap: 'handleEventDetail' },
         children: [
           {
             type: 'row',
@@ -630,8 +866,9 @@
     const { statsPanel } = require("src/ui/components/stats_panel.js");
     const { weekdayHeader, generateCalendarGrid } = require("src/ui/components/calendar_grid.js");
     const { selectedDayPanel } = require("src/ui/components/event_list.js");
-    const { t } = require("src/i18n.js");
-    const { text } = require("src/ui/tokens.js");
+    const { formatDate, formatTime } = require("src/utils/date.js");
+    const { getCategoryName, listSeparator, t } = require("src/i18n.js");
+    const { text, sizedBox } = require("src/ui/tokens.js");
     function renderCalendarPage() {
       const year = calendarState.currentDate.getFullYear();
       const month = calendarState.currentDate.getMonth() + 1;
@@ -645,7 +882,8 @@
           type: 'column',
           padding: '12,12,12,12',
           scrollable: true,
-          crossAxisAlignment: 'stretch'
+          crossAxisAlignment: 'stretch',
+          spacing: 10
         },
         children: [
           header(year, month),
@@ -661,19 +899,337 @@
             children: generateCalendarGrid()
           },
           selectedDayPanel(selectedEvents),
-          actionPanel()
+          editorPanel(),
+          moduleTabs(),
+          modulePanel()
         ]
       };
     }
     
-    function actionPanel() {
+    function editorPanel() {
+      const draft = calendarState.draft;
+      const attendees = draft.attendees || [];
+    
+      return {
+        type: 'card',
+        style: { margin: '2,0,10,0' },
+        children: [
+          text(t('calendar.editorTitle'), 17, '#111827', '700'),
+          text(t('calendar.editorSubtitle'), 12, '#6B7280', '400'),
+          formField('title', t('calendar.fieldTitle'), draft.title),
+          formField('location', t('calendar.fieldLocation'), draft.location),
+          formField('startTime', t('calendar.fieldStartTime'), formatTime(new Date(draft.startTime))),
+          formField('endTime', t('calendar.fieldEndTime'), formatTime(new Date(draft.endTime))),
+          formField('notes', t('calendar.fieldNotes'), draft.notes, true),
+          optionRow([
+            eventTypeButton('meeting'),
+            eventTypeButton('task'),
+            eventTypeButton('approval'),
+            eventTypeButton('reminder')
+          ]),
+          repeatRow(),
+          reminderRow(),
+          attendees.length > 0
+            ? text(t('calendar.attendees', { attendees: attendees.join(listSeparator()) }), 12, '#4B5563', '400')
+            : text(t('contact.empty'), 12, '#9CA3AF', '400'),
+          {
+            type: 'row',
+            children: [
+              actionButton(t('calendar.pickContacts'), 'handlePickContacts'),
+              sizedBox(8, 0),
+              actionButton(t('calendar.save'), 'handleSaveEvent'),
+              sizedBox(8, 0),
+              dangerButton(t('calendar.delete'), 'handleDeleteEvent', { id: draft.id })
+            ]
+          }
+        ]
+      };
+    }
+    
+    function formField(field, label, value, multiline) {
+      return {
+        type: multiline ? 'textarea' : 'textFormField',
+        id: field,
+        props: {
+          label,
+          hint: label,
+          initialValue: value || '',
+          maxLines: multiline ? 4 : 1,
+          keyboardType: field === 'startTime' || field === 'endTime' ? 'text' : 'text'
+        }
+      };
+    }
+    
+    function eventTypeButton(type) {
+      const active = calendarState.draft.type === type;
+      const category = calendarState.categories[type] || calendarState.categories.task;
+      return {
+        type: 'expanded',
+        children: [
+          {
+            type: 'container',
+            props: { field: 'type', value: type },
+            style: {
+              backgroundColor: active ? category.color : '#F3F4F6',
+              borderRadius: 8,
+              padding: '8,4,8,4',
+              margin: '8,4,0,0'
+            },
+            events: { onTap: 'handleEditorChange' },
+            children: [
+              text(getCategoryName(type), 12, active ? '#FFFFFF' : '#374151', active ? '700' : '500', 'center')
+            ]
+          }
+        ]
+      };
+    }
+    
+    function repeatRow() {
+      return optionRow([
+        repeatButton('none'),
+        repeatButton('daily'),
+        repeatButton('weekly'),
+        repeatButton('monthly')
+      ]);
+    }
+    
+    function repeatButton(value) {
+      const active = calendarState.draft.recurrence === value;
+      return chipButton(
+        t('calendar.recurrence.' + value),
+        active,
+        'handleToggleRepeat',
+        { value }
+      );
+    }
+    
+    function reminderRow() {
+      return optionRow([
+        chipButton(t('calendar.reminder'), calendarState.draft.reminderEnabled, 'handleToggleReminder', { value: !calendarState.draft.reminderEnabled }),
+        chipButton('5m', calendarState.draft.reminderMinutes === 5, 'handleChangeReminderMinutes', { value: 5 }),
+        chipButton('15m', calendarState.draft.reminderMinutes === 15, 'handleChangeReminderMinutes', { value: 15 }),
+        chipButton('30m', calendarState.draft.reminderMinutes === 30, 'handleChangeReminderMinutes', { value: 30 })
+      ]);
+    }
+    
+    function chipButton(label, active, handler, props) {
+      return {
+        type: 'expanded',
+        children: [
+          {
+            type: 'container',
+            props,
+            style: {
+              backgroundColor: active ? '#111827' : '#F3F4F6',
+              borderRadius: 8,
+              padding: '8,4,8,4',
+              margin: '8,4,0,0'
+            },
+            events: { onTap: handler },
+            children: [text(label, 12, active ? '#FFFFFF' : '#374151', active ? '700' : '500', 'center')]
+          }
+        ]
+      };
+    }
+    
+    function optionRow(children) {
+      return {
+        type: 'row',
+        children
+      };
+    }
+    
+    function actionButton(label, handler, props) {
+      return {
+        type: 'expanded',
+        children: [
+          {
+            type: 'button',
+            props: { text: label, ...(props || {}) },
+            events: { onTap: handler }
+          }
+        ]
+      };
+    }
+    
+    function dangerButton(label, handler, props) {
+      return {
+        type: 'expanded',
+        children: [
+          {
+            type: 'container',
+            props: props || {},
+            style: {
+              backgroundColor: '#FEE2E2',
+              borderRadius: 8,
+              padding: '10,4,10,4'
+            },
+            events: { onTap: handler },
+            children: [text(label, 13, '#B91C1C', '700', 'center')]
+          }
+        ]
+      };
+    }
+    
+    function moduleTabs() {
+      const modules = ['schedule', 'approval', 'task', 'contacts', 'notifications'];
       return {
         type: 'card',
         children: [
-          text(t('calendar.futureTitle'), 16, '#111827', '700'),
-          text(t('calendar.futureDescription'), 13, '#4B5563', '400')
+          text(t('calendar.modules'), 16, '#111827', '700'),
+          {
+            type: 'row',
+            children: modules.map(moduleTab)
+          }
         ]
       };
+    }
+    
+    function moduleTab(module) {
+      const active = calendarState.activeModule === module;
+      return {
+        type: 'expanded',
+        children: [
+          {
+            type: 'container',
+            props: { module },
+            style: {
+              backgroundColor: active ? '#DBEAFE' : '#F9FAFB',
+              borderRadius: 8,
+              padding: '8,2,8,2',
+              margin: '8,2,0,0'
+            },
+            events: { onTap: 'handleSwitchModule' },
+            children: [
+              text(t('calendar.module.' + module), 11, active ? '#1D4ED8' : '#4B5563', active ? '700' : '500', 'center')
+            ]
+          }
+        ]
+      };
+    }
+    
+    function modulePanel() {
+      if (calendarState.activeModule === 'approval') {
+        return approvalPanel();
+      }
+      if (calendarState.activeModule === 'task') {
+        return taskPanel();
+      }
+      if (calendarState.activeModule === 'contacts') {
+        return contactPanel();
+      }
+      if (calendarState.activeModule === 'notifications') {
+        return notificationPanel();
+      }
+      return schedulePanel();
+    }
+    
+    function schedulePanel() {
+      return {
+        type: 'card',
+        children: [
+          text(t('calendar.todaySchedule'), 16, '#111827', '700'),
+          ...calendarState.events.slice(0, 4).map(item => text(item.title + ' / ' + getCategoryName(item.type), 13, '#4B5563', '400'))
+        ]
+      };
+    }
+    
+    function approvalPanel() {
+      return listPanel(
+        t('approval.title'),
+        calendarState.approvals,
+        item => [
+          text(item.title, 14, '#111827', '700'),
+          text(t('approval.owner', { owner: item.owner }) + ' / ' + approvalStatus(item.status), 12, '#6B7280', '400'),
+          {
+            type: 'row',
+            children: [
+              actionButton(t('approval.approve'), 'handleApprovalAction', { id: item.id, action: 'approve' }),
+              sizedBox(8, 0),
+              actionButton(t('approval.reject'), 'handleApprovalAction', { id: item.id, action: 'reject' })
+            ]
+          }
+        ],
+        t('approval.empty')
+      );
+    }
+    
+    function taskPanel() {
+      return listPanel(
+        t('task.title'),
+        calendarState.tasks,
+        item => [
+          text(item.title, 14, '#111827', '700'),
+          text(t('task.status.' + item.status) + ' / ' + t('task.dueAt', { time: formatDate(new Date(item.dueAt)) }), 12, '#6B7280', '400'),
+          {
+            type: 'row',
+            children: [
+              actionButton(t('task.start'), 'handleTaskAction', { id: item.id, action: 'start' }),
+              sizedBox(8, 0),
+              actionButton(t('task.finish'), 'handleTaskAction', { id: item.id, action: 'done' })
+            ]
+          }
+        ],
+        t('task.empty')
+      );
+    }
+    
+    function contactPanel() {
+      const items = (calendarState.draft.attendees || []).map((name, index) => ({
+        id: calendarState.draft.attendeeIds[index] || name,
+        name,
+        department: ''
+      }));
+      return listPanel(
+        t('contact.title'),
+        items,
+        item => [
+          text(item.name, 14, '#111827', '700'),
+          text(item.id, 12, '#6B7280', '400')
+        ],
+        t('contact.empty')
+      );
+    }
+    
+    function notificationPanel() {
+      return listPanel(
+        t('notification.title'),
+        calendarState.notifications,
+        item => [
+          text(item.title, 14, '#111827', '700'),
+          text(item.read ? t('notification.read') : t('notification.unread'), 12, '#6B7280', '400')
+        ],
+        t('notification.empty')
+      );
+    }
+    
+    function listPanel(title, items, renderItem, emptyText) {
+      return {
+        type: 'card',
+        children: [
+          text(title, 16, '#111827', '700'),
+          ...(items.length === 0 ? [text(emptyText, 13, '#6B7280', '400')] : items.map(item => ({
+            type: 'container',
+            style: {
+              backgroundColor: '#F9FAFB',
+              borderRadius: 8,
+              padding: '10,10,10,10',
+              margin: '8,0,0,0'
+            },
+            children: renderItem(item)
+          })))
+        ]
+      };
+    }
+    
+    function approvalStatus(status) {
+      if (status === 'approved') {
+        return t('approval.status.approved');
+      }
+      if (status === 'rejected') {
+        return t('approval.status.rejected');
+      }
+      return t('approval.status.pending');
     }
     
     exports["renderCalendarPage"] = renderCalendarPage;
@@ -708,19 +1264,48 @@
       }
       return invokeHost('toast.show', { message });
     }
+    function pickContacts(selectedIds) {
+      if (typeof invokeHost !== 'function') {
+        return null;
+      }
+      return invokeHost('org.contacts.pick', {
+        multiple: true,
+        selectedIds: selectedIds || []
+      });
+    }
+    function sendNotification(title, body, payload) {
+      if (typeof invokeHost !== 'function') {
+        return null;
+      }
+      return invokeHost('notification.send', {
+        title,
+        body,
+        payload: payload || {}
+      });
+    }
+    function submitApproval(payload) {
+      if (typeof invokeHost !== 'function') {
+        return null;
+      }
+      return invokeHost('approval.submit', payload || {});
+    }
     
     exports["showToast"] = showToast;
+    exports["pickContacts"] = pickContacts;
+    exports["sendNotification"] = sendNotification;
+    exports["submitApproval"] = submitApproval;
   });
 
   define("src/controllers/calendar_handlers.js", function(module, exports, require) {
-    const { calendarState } = require("src/state/calendar_state.js");
-    const { showToast } = require("src/services/host_api.js");
+    const { calendarState, cloneEvent, createDraft } = require("src/state/calendar_state.js");
+    const { pickContacts, sendNotification, showToast, submitApproval } = require("src/services/host_api.js");
     const { parseDate } = require("src/utils/date.js");
     const { renderCalendarPage } = require("src/ui/pages/calendar_page.js");
     const { t, toggleLocale } = require("src/i18n.js");
     function handleGoToday() {
       calendarState.currentDate = new Date();
       calendarState.selectedDate = new Date();
+      syncDraftForSelectedDay();
       return fullUpdate();
     }
     function handlePreviousMonth() {
@@ -730,6 +1315,7 @@
         1
       );
       calendarState.selectedDate = new Date(calendarState.currentDate);
+      syncDraftForSelectedDay();
       return fullUpdate();
     }
     function handleNextMonth() {
@@ -739,33 +1325,173 @@
         1
       );
       calendarState.selectedDate = new Date(calendarState.currentDate);
+      syncDraftForSelectedDay();
       return fullUpdate();
     }
     function handleDateClick(state) {
       const date = state && state.props ? state.props.date : null;
       if (date) {
         calendarState.selectedDate = parseDate(date);
+        syncDraftForSelectedDay();
+      }
+      return fullUpdate();
+    }
+    function handleEventDetail(state) {
+      const eventId = state && state.props ? state.props.eventId : null;
+      const event = calendarState.events.find(item => item.id === eventId);
+      if (event) {
+        calendarState.selectedEventId = event.id;
+        calendarState.editorMode = 'edit';
+        calendarState.draft = cloneEvent(event);
+        calendarState.editorKey = event.id;
+        calendarState.selectedDate = new Date(event.startTime);
       }
       return fullUpdate();
     }
     function handleCreateEvent() {
       const base = calendarState.selectedDate || new Date();
-      const id = 'evt_' + (calendarState.events.length + 1);
-      calendarState.events.push({
-        id,
-        title: '新建跟进事项',
-        titleKey: 'event.newTask.title',
-        type: 'task',
-        startTime: new Date(base.getFullYear(), base.getMonth(), base.getDate(), 17, 0, 0).toISOString(),
-        endTime: new Date(base.getFullYear(), base.getMonth(), base.getDate(), 18, 0, 0).toISOString(),
-        location: '待确认',
-        locationKey: 'event.newTask.location',
-        attendees: ['我'],
-        attendeeKeys: ['event.currentUser'],
-        notes: '从插件快速创建的临时事项',
-        notesKey: 'event.newTask.notes'
+      calendarState.selectedEventId = null;
+      calendarState.editorMode = 'create';
+      calendarState.draft = createDraft(base);
+      calendarState.editorKey = calendarState.draft.id;
+      showToast(t('calendar.toastEditStart'));
+      return fullUpdate();
+    }
+    function handleSwitchModule(state) {
+      const next = state && state.props ? state.props.module : 'schedule';
+      calendarState.activeModule = next;
+      return fullUpdate();
+    }
+    function handleEditorChange(state) {
+      const form = (state && state.form) || {};
+      const field = state && state.props ? state.props.field : null;
+      const value = state && state.props ? state.props.value : null;
+      if (!field) {
+        return fullUpdate();
+      }
+      calendarState.draft = {
+        ...calendarState.draft,
+        ...form,
+        [field]: value
+      };
+      if (field === 'type' && value === 'approval') {
+        calendarState.draft = {
+          ...calendarState.draft,
+          approvalStatus: 'draft',
+          taskStatus: 'open'
+        };
+      }
+      return fullUpdate();
+    }
+    function handlePickContacts() {
+      const selectedIds = calendarState.draft.attendeeIds || [];
+      const result = pickContacts(selectedIds);
+      if (!result) {
+        const fallback = [
+          { id: 'local_1', name: '张三' },
+          { id: 'local_2', name: '李四' }
+        ];
+        calendarState.contacts = fallback;
+        calendarState.draft = {
+          ...calendarState.draft,
+          attendees: fallback.map(item => item.name),
+          attendeeIds: fallback.map(item => item.id)
+        };
+        return fullUpdate();
+      }
+      return Promise.resolve(result).then(data => {
+        const items = extractItems(data);
+        calendarState.contacts = items;
+        calendarState.draft = {
+          ...calendarState.draft,
+          attendees: items.map(item => item.name),
+          attendeeIds: items.map(item => item.id)
+        };
+        return fullUpdate();
       });
-      showToast(t('calendar.toastCreated'));
+    }
+    function handleSaveEvent(state) {
+      const form = (state && state.form) || {};
+      const draft = normalizeDraft({
+        ...calendarState.draft,
+        ...form
+      });
+      const existingIndex = calendarState.events.findIndex(item => item.id === draft.id);
+      if (existingIndex >= 0) {
+        calendarState.events[existingIndex] = draft;
+      } else {
+        calendarState.events = [draft, ...calendarState.events];
+      }
+      calendarState.selectedEventId = draft.id;
+      calendarState.editorMode = 'edit';
+      calendarState.draft = cloneEvent(draft);
+      if (draft.type === 'approval') {
+        calendarState.approvals = [
+          {
+            id: draft.id,
+            title: draft.title,
+            owner: draft.location || '流程发起人',
+            status: draft.approvalStatus || 'pending',
+            createdAt: new Date().toISOString()
+          },
+          ...calendarState.approvals.filter(item => item.id !== draft.id)
+        ];
+        submitApproval({
+          id: draft.id,
+          title: draft.title,
+          owner: draft.location || '流程发起人',
+          attendees: draft.attendees
+        });
+      }
+      if (draft.reminderEnabled) {
+        sendNotification(
+          t('calendar.reminderTitle', { title: draft.title }),
+          t('calendar.reminderBody', { time: formatReminderTime(draft), location: draft.location || t('calendar.locationTbd') }),
+          { eventId: draft.id }
+        );
+      }
+      showToast(t('calendar.toastSaved'));
+      return fullUpdate();
+    }
+    function handleDeleteEvent(state) {
+      const id = state && state.props ? state.props.id : calendarState.draft.id;
+      calendarState.events = calendarState.events.filter(item => item.id !== id);
+      calendarState.approvals = calendarState.approvals.filter(item => item.id !== id);
+      calendarState.tasks = calendarState.tasks.filter(item => item.id !== id);
+      calendarState.selectedEventId = null;
+      calendarState.editorMode = 'create';
+      calendarState.draft = createDraft(calendarState.selectedDate || new Date());
+      showToast(t('calendar.toastDeleted'));
+      return fullUpdate();
+    }
+    function handleToggleRepeat(state) {
+      const form = (state && state.form) || {};
+      const value = state && state.props ? state.props.value : 'none';
+      calendarState.draft = {
+        ...calendarState.draft,
+        ...form,
+        recurrence: value
+      };
+      return fullUpdate();
+    }
+    function handleToggleReminder(state) {
+      const form = (state && state.form) || {};
+      const value = state && state.props ? state.props.value : false;
+      calendarState.draft = {
+        ...calendarState.draft,
+        ...form,
+        reminderEnabled: Boolean(value)
+      };
+      return fullUpdate();
+    }
+    function handleChangeReminderMinutes(state) {
+      const form = (state && state.form) || {};
+      const value = state && state.props ? Number(state.props.value) : 15;
+      calendarState.draft = {
+        ...calendarState.draft,
+        ...form,
+        reminderMinutes: value
+      };
       return fullUpdate();
     }
     function handleToggleLocale() {
@@ -775,8 +1501,115 @@
     function handleFilter() {
       return fullUpdate();
     }
-    function handleEventDetail() {
+    function handleApprovalAction(state) {
+      const id = state && state.props ? state.props.id : null;
+      const action = state && state.props ? state.props.action : 'approve';
+      const item = calendarState.approvals.find(entry => entry.id === id);
+      if (item) {
+        item.status = action === 'reject' ? 'rejected' : 'approved';
+        showToast(t(action === 'reject' ? 'approval.toastRejected' : 'approval.toastApproved'));
+      }
       return fullUpdate();
+    }
+    function handleTaskAction(state) {
+      const id = state && state.props ? state.props.id : null;
+      const action = state && state.props ? state.props.action : 'done';
+      const item = calendarState.tasks.find(entry => entry.id === id);
+      if (item) {
+        item.status = action === 'done' ? 'done' : 'doing';
+        showToast(t('task.toastUpdated'));
+      }
+      return fullUpdate();
+    }
+    
+    function syncDraftForSelectedDay() {
+      if (calendarState.editorMode === 'edit' && calendarState.selectedEventId) {
+        const event = calendarState.events.find(item => item.id === calendarState.selectedEventId);
+        if (event) {
+          calendarState.draft = cloneEvent(event);
+          return;
+        }
+      }
+      calendarState.draft = createDraft(calendarState.selectedDate || new Date());
+    }
+    
+    function normalizeDraft(draft) {
+      const base = calendarState.selectedDate || new Date();
+      const start = parseDateTime(base, draft.startTime, 9, 0);
+      const end = parseDateTime(base, draft.endTime, 10, 0);
+      const attendees = draft.attendees || [];
+      const attendeeIds = draft.attendeeIds || [];
+      const title = draft.title || '新建跟进事项';
+      return {
+        ...draft,
+        id: draft.id || `evt_${Date.now()}`,
+        title,
+        type: draft.type || 'task',
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        location: draft.location || '',
+        attendees,
+        attendeeIds,
+        notes: draft.notes || '',
+        recurrence: draft.recurrence || 'none',
+        reminderEnabled: draft.reminderEnabled !== false,
+        reminderMinutes: Number(draft.reminderMinutes ?? 15),
+        approvalStatus: draft.approvalStatus || 'draft',
+        taskStatus: draft.taskStatus || 'open'
+      };
+    }
+    
+    function formatReminderTime(draft) {
+      const start = new Date(draft.startTime || new Date());
+      return `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
+    }
+    
+    function extractItems(payload) {
+      if (!payload) {
+        return [];
+      }
+      const root = payload.data || payload;
+      if (Array.isArray(root.items)) {
+        return root.items;
+      }
+      if (Array.isArray(root)) {
+        return root;
+      }
+      return [];
+    }
+    
+    function parseDateTime(baseDate, timeText, defaultHour, defaultMinute) {
+      if (!timeText || typeof timeText !== 'string' || !timeText.includes(':')) {
+        return new Date(
+          baseDate.getFullYear(),
+          baseDate.getMonth(),
+          baseDate.getDate(),
+          defaultHour,
+          defaultMinute,
+          0
+        );
+      }
+      const [hourText, minuteText] = timeText.split(':');
+      const hour = Number(hourText);
+      const minute = Number(minuteText);
+      if (Number.isNaN(hour) || Number.isNaN(minute)) {
+        return new Date(
+          baseDate.getFullYear(),
+          baseDate.getMonth(),
+          baseDate.getDate(),
+          defaultHour,
+          defaultMinute,
+          0
+        );
+      }
+      return new Date(
+        baseDate.getFullYear(),
+        baseDate.getMonth(),
+        baseDate.getDate(),
+        hour,
+        minute,
+        0
+      );
     }
     
     function fullUpdate() {
@@ -790,24 +1623,44 @@
     exports["handlePreviousMonth"] = handlePreviousMonth;
     exports["handleNextMonth"] = handleNextMonth;
     exports["handleDateClick"] = handleDateClick;
+    exports["handleEventDetail"] = handleEventDetail;
     exports["handleCreateEvent"] = handleCreateEvent;
+    exports["handleSwitchModule"] = handleSwitchModule;
+    exports["handleEditorChange"] = handleEditorChange;
+    exports["handlePickContacts"] = handlePickContacts;
+    exports["handleSaveEvent"] = handleSaveEvent;
+    exports["handleDeleteEvent"] = handleDeleteEvent;
+    exports["handleToggleRepeat"] = handleToggleRepeat;
+    exports["handleToggleReminder"] = handleToggleReminder;
+    exports["handleChangeReminderMinutes"] = handleChangeReminderMinutes;
     exports["handleToggleLocale"] = handleToggleLocale;
     exports["handleFilter"] = handleFilter;
-    exports["handleEventDetail"] = handleEventDetail;
+    exports["handleApprovalAction"] = handleApprovalAction;
+    exports["handleTaskAction"] = handleTaskAction;
   });
 
   define("src/index.js", function(module, exports, require) {
     const { ensureCalendarData } = require("src/state/calendar_state.js");
     const { renderCalendarPage } = require("src/ui/pages/calendar_page.js");
     const { renderTodayCard } = require("src/ui/cards/today_card.js");
-    const { handleCreateEvent, handleDateClick, handleEventDetail, handleFilter, handleGoToday, handleNextMonth, handlePreviousMonth, handleToggleLocale } = require("src/controllers/calendar_handlers.js");
+    const { handleApprovalAction, handleChangeReminderMinutes, handleCreateEvent, handleDateClick, handleDeleteEvent, handleEditorChange, handleEventDetail, handleFilter, handleGoToday, handleNextMonth, handlePickContacts, handlePreviousMonth, handleSaveEvent, handleSwitchModule, handleTaskAction, handleToggleReminder, handleToggleRepeat, handleToggleLocale } = require("src/controllers/calendar_handlers.js");
+    exports["handleApprovalAction"] = handleApprovalAction;
+    exports["handleChangeReminderMinutes"] = handleChangeReminderMinutes;
     exports["handleCreateEvent"] = handleCreateEvent;
     exports["handleDateClick"] = handleDateClick;
+    exports["handleDeleteEvent"] = handleDeleteEvent;
+    exports["handleEditorChange"] = handleEditorChange;
     exports["handleEventDetail"] = handleEventDetail;
     exports["handleFilter"] = handleFilter;
     exports["handleGoToday"] = handleGoToday;
     exports["handleNextMonth"] = handleNextMonth;
+    exports["handlePickContacts"] = handlePickContacts;
     exports["handlePreviousMonth"] = handlePreviousMonth;
+    exports["handleSaveEvent"] = handleSaveEvent;
+    exports["handleSwitchModule"] = handleSwitchModule;
+    exports["handleTaskAction"] = handleTaskAction;
+    exports["handleToggleReminder"] = handleToggleReminder;
+    exports["handleToggleRepeat"] = handleToggleRepeat;
     exports["handleToggleLocale"] = handleToggleLocale;
     function onActivate() {
       ensureCalendarData();
@@ -829,7 +1682,7 @@
   });
 
   const entry = require("src/index.js");
-  for (const name of ["onActivate", "onDeactivate", "renderPage", "renderCard", "handleCreateEvent", "handleDateClick", "handleEventDetail", "handleFilter", "handleGoToday", "handleNextMonth", "handlePreviousMonth", "handleToggleLocale"]) {
+  for (const name of ["onActivate", "onDeactivate", "renderPage", "renderCard", "handleApprovalAction", "handleChangeReminderMinutes", "handleCreateEvent", "handleDateClick", "handleDeleteEvent", "handleEditorChange", "handleEventDetail", "handleFilter", "handleGoToday", "handleNextMonth", "handlePickContacts", "handlePreviousMonth", "handleSaveEvent", "handleSwitchModule", "handleTaskAction", "handleToggleReminder", "handleToggleRepeat", "handleToggleLocale"]) {
     if (typeof entry[name] === 'function') {
       globalThis[name] = entry[name];
     }
