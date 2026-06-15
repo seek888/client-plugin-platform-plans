@@ -49,6 +49,20 @@ class AccountCapabilities {
     );
   }
 
+  /// 选择联系人
+  ///
+  /// 由 Flutter 宿主对接 IM/组织通讯录等业务数据源，插件只通过能力桥获取结果。
+  static Capability pickContacts({
+    required Future<Map<String, dynamic>> Function(Map<String, dynamic>)
+        handler,
+  }) {
+    return Capability(
+      id: 'org.contacts.pick',
+      requiredPermissions: ['org.contacts.read'],
+      handler: handler,
+    );
+  }
+
   /// 获取部门列表
   static Capability getDepartments({
     required Future<Map<String, dynamic>> Function() handler,

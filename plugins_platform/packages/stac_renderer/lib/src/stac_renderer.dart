@@ -1,25 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
 import 'package:core/core.dart';
 import 'package:flutter/material.dart';
-import 'package:stac/stac.dart' as official_stac;
-import 'package:stac_framework/stac_framework.dart';
 
 /// STAC 渲染器。
 ///
-/// 对外保留平台原有的 [STACSchema] / [STACNode] API，内部使用官方
-/// `stac` Flutter 包完成动态 UI 渲染。
+/// 对外保留平台原有的 [STACSchema] / [STACNode] API，内部直接生成
+/// Flutter Widget，不再依赖官方 STAC 解析链路。
 class STACRenderer {
-  static Future<void>? _initializeFuture;
-
-  /// 初始化官方 Stac，并注册插件事件 action。
-  static Future<void> initialize() {
-    return _initializeFuture ??= official_stac.Stac.initialize(
-      actionParsers: const [_PluginEventActionParser()],
-      override: true,
-    );
-  }
+  static Future<void> initialize() async {}
 
   /// 渲染 Schema 为 Widget。
   static Widget render(
@@ -70,6 +61,9 @@ class STACFormKey {
 
   final Map<String, dynamic> _values = {};
 
+  /// 获取表单字段的当前值。
+  dynamic getValue(String id) => _values[id];
+
   /// 设置表单值。
   void setValue(String id, dynamic value) {
     _values[id] = value;
@@ -111,13 +105,11 @@ class _STACSchemaWidget extends StatefulWidget {
 
 class _STACSchemaWidgetState extends State<_STACSchemaWidget> {
   late Map<String, dynamic> _sourceJson;
-  late _STACSourceType _sourceType;
 
   @override
   void initState() {
     super.initState();
     _sourceJson = Map<String, dynamic>.from(widget.sourceJson);
-    _sourceType = widget.sourceType;
   }
 
   @override
@@ -126,34 +118,25 @@ class _STACSchemaWidgetState extends State<_STACSchemaWidget> {
     if (oldWidget.sourceJson != widget.sourceJson ||
         oldWidget.sourceType != widget.sourceType) {
       _sourceJson = Map<String, dynamic>.from(widget.sourceJson);
-      _sourceType = widget.sourceType;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: STACRenderer.initialize(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const SizedBox.shrink();
-        }
+    final formKey = widget.formKey;
+    final child = _buildNode(
+      context,
+      _sourceJson,
+      data: widget.data,
+      onEvent: _handleEvent,
+      formKey: formKey,
+    );
 
-        final formKey = widget.formKey;
-        final child = Builder(
-          builder: (context) {
-            return official_stac.Stac.fromJson(_officialJson, context) ??
-                const SizedBox.shrink();
-          },
-        );
-
-        return _PluginEventScope(
-          data: widget.data,
-          formKey: formKey,
-          eventHandler: _handleEvent,
-          child: formKey == null ? child : Form(key: formKey.key, child: child),
-        );
-      },
+    return _PluginEventScope(
+      data: widget.data,
+      formKey: formKey,
+      eventHandler: _handleEvent,
+      child: formKey == null ? child : Form(key: formKey.key, child: child),
     );
   }
 
@@ -167,7 +150,6 @@ class _STACSchemaWidgetState extends State<_STACSchemaWidget> {
     if (update.type == STACUpdateType.full && update.schema != null) {
       setState(() {
         _sourceJson = Map<String, dynamic>.from(update.schema!);
-        _sourceType = _STACSourceType.schema;
       });
     } else if (update.type == STACUpdateType.patch && update.patches != null) {
       final patched = _applyPatches(_sourceJson, update.patches!);
@@ -177,13 +159,6 @@ class _STACSchemaWidgetState extends State<_STACSchemaWidget> {
     }
 
     return update;
-  }
-
-  Map<String, dynamic> get _officialJson {
-    return switch (_sourceType) {
-      _STACSourceType.schema => _schemaMapToOfficialStacJson(_sourceJson),
-      _STACSourceType.node => _nodeMapToOfficialStacJson(_sourceJson),
-    };
   }
 }
 
@@ -199,10 +174,6 @@ class _PluginEventScope extends InheritedWidget {
   final STACFormKey? formKey;
   final STACEventHandler eventHandler;
 
-  static _PluginEventScope? maybeOf(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<_PluginEventScope>();
-  }
-
   @override
   bool updateShouldNotify(_PluginEventScope oldWidget) {
     return data != oldWidget.data ||
@@ -211,494 +182,1071 @@ class _PluginEventScope extends InheritedWidget {
   }
 }
 
-class _PluginEventAction {
-  const _PluginEventAction({
-    required this.eventName,
-    required this.params,
-  });
+Widget _buildNode(
+  BuildContext context,
+  Map<String, dynamic> node, {
+  required Map<String, dynamic> data,
+  required STACEventHandler? onEvent,
+  required STACFormKey? formKey,
+}) {
+  final type = node['type'] as String? ?? 'unknown';
+  final props = Map<String, dynamic>.from(node['props'] as Map? ?? const {});
+  final children = _buildChildren(
+    context,
+    node['children'],
+    data: data,
+    onEvent: onEvent,
+    formKey: formKey,
+  );
+  final style = Map<String, dynamic>.from(node['style'] as Map? ?? const {});
+  final body = _buildNodeCore(
+    context,
+    type,
+    node,
+    props,
+    children,
+    data: data,
+    onEvent: onEvent,
+    formKey: formKey,
+  );
 
-  final String eventName;
-  final Map<String, dynamic> params;
-}
-
-class _PluginEventActionParser extends StacActionParser<_PluginEventAction> {
-  const _PluginEventActionParser();
-
-  @override
-  String get actionType => 'pluginEvent';
-
-  @override
-  _PluginEventAction getModel(Map<String, dynamic> json) {
-    final params = Map<String, dynamic>.from(
-      json['params'] as Map? ?? const {},
+  final styled = _applyNodeStyle(body, style);
+  if (_shouldWrapTap(type, node)) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _buildTapHandler(
+        context,
+        node,
+        eventName: STACEventTypes.onTap,
+        onEvent: onEvent,
+        data: data,
+        formKey: formKey,
+      ),
+      child: styled,
     );
-    return _PluginEventAction(
-      eventName: json['eventName'] as String? ?? params['handler'] as String,
-      params: params,
-    );
   }
 
-  @override
-  FutureOr<dynamic> onCall(BuildContext context, _PluginEventAction model) {
-    final scope = _PluginEventScope.maybeOf(context);
-    if (scope == null) return null;
-
-    return scope.eventHandler(model.eventName, {
-      ...model.params,
-      'currentData': scope.data,
-      'form': scope.formKey?.getValues() ?? const <String, dynamic>{},
-    });
-  }
+  return styled;
 }
 
-Map<String, dynamic> _schemaMapToOfficialStacJson(Map<String, dynamic> schema) {
-  final type = schema['type'] as String?;
-  final title = schema['title'] as String?;
-  final children = _childrenToOfficialStacJson(schema['children']);
-  final layout = schema['layout'] as Map?;
-
-  final content = layout == null
-      ? _column(children)
-      : _layoutToOfficialStacJson(
-          Map<String, dynamic>.from(layout),
-          children,
-        );
-
-  final body = _applyStyle(content, schema['style'] as Map?);
-
-  switch (type) {
-    case 'page':
-      return {
-        'type': 'scaffold',
-        if (title != null)
-          'appBar': {
-            'type': 'appBar',
-            'title': {'type': 'text', 'data': title},
-          },
-        'body': body,
-      };
-    case 'dialog':
-      return {
-        'type': 'alertDialog',
-        if (title != null) 'title': {'type': 'text', 'data': title},
-        'content': body,
-      };
-    case 'card':
-      return {
-        'type': 'card',
-        'child': _padding(16, body),
-      };
-    default:
-      return body;
-  }
-}
-
-List<Map<String, dynamic>> _childrenToOfficialStacJson(dynamic value) {
+List<Widget> _buildChildren(
+  BuildContext context,
+  dynamic value, {
+  required Map<String, dynamic> data,
+  required STACEventHandler? onEvent,
+  required STACFormKey? formKey,
+}) {
   final children = value is List ? value : const [];
   return children
       .whereType<Map>()
       .map(
-          (node) => _nodeMapToOfficialStacJson(Map<String, dynamic>.from(node)))
-      .toList();
+        (node) => _buildNode(
+          context,
+          Map<String, dynamic>.from(node),
+          data: data,
+          onEvent: onEvent,
+          formKey: formKey,
+        ),
+      )
+      .toList(growable: false);
 }
 
-Map<String, dynamic> _nodeMapToOfficialStacJson(Map<String, dynamic> node) {
-  final type = node['type'] as String? ?? 'unknown';
-  final props = Map<String, dynamic>.from(node['props'] as Map? ?? const {});
-  final children = _childrenToOfficialStacJson(node['children']);
-  final style = node['style'] as Map?;
-
-  Map<String, dynamic> result;
+Widget _buildNodeCore(
+  BuildContext context,
+  String type,
+  Map<String, dynamic> node,
+  Map<String, dynamic> props,
+  List<Widget> children, {
+  required Map<String, dynamic> data,
+  required STACEventHandler? onEvent,
+  required STACFormKey? formKey,
+}) {
   switch (type) {
+    case 'page':
+      return _buildPage(node, children);
+    case 'dialog':
+      return AlertDialog(
+        title: node['title'] == null ? null : Text(node['title'].toString()),
+        content: _buildLayout(node['layout'] as Map?, children),
+      );
     case STACComponentTypes.container:
-      result = {
-        'type': 'container',
-        'child': _column(children),
-      };
-      break;
+      return _buildContainer(children, props);
+    case STACComponentTypes.scaffold:
+      return Scaffold(
+        appBar: props['title'] == null
+            ? null
+            : AppBar(title: Text(props['title'].toString())),
+        body: _vertical(children),
+      );
+    case STACComponentTypes.appBar:
+      return AppBar(title: Text(props['title']?.toString() ?? ''));
     case STACComponentTypes.column:
-      result = _column(children);
-      break;
+      return _buildColumn(children, props);
     case STACComponentTypes.row:
-      result = {'type': 'row', 'children': children};
-      break;
+      return _buildRow(children, props);
     case STACComponentTypes.stack:
-      result = {'type': 'stack', 'children': children};
-      break;
+      return Stack(children: children);
     case STACComponentTypes.expanded:
-      result = {
-        'type': 'expanded',
-        'child': children.isNotEmpty ? children.first : _empty(),
-      };
-      break;
+      return Expanded(
+          child:
+              children.isNotEmpty ? children.first : const SizedBox.shrink());
     case STACComponentTypes.sizedBox:
-      result = {
-        'type': 'sizedBox',
-        if (props['width'] != null) 'width': props['width'],
-        if (props['height'] != null) 'height': props['height'],
-      };
-      break;
+      return SizedBox(
+        width: _toDouble(props['width']),
+        height: _toDouble(props['height']),
+      );
     case STACComponentTypes.text:
-      result = {
-        'type': 'text',
-        'data': props['text']?.toString() ?? '',
-        ..._textStyle(style),
-      };
-      break;
+      return _buildText(props, node['style'] as Map?);
     case STACComponentTypes.image:
-      result = {
-        'type': 'image',
-        'src': props['src']?.toString() ?? '',
-        if (props['width'] != null) 'width': props['width'],
-        if (props['height'] != null) 'height': props['height'],
-        if (props['fit'] != null) 'fit': props['fit'],
-      };
-      break;
+      return _buildImage(props);
     case STACComponentTypes.icon:
-      result = {
-        'type': 'icon',
-        'icon': _iconName(props['icon']),
-        if (props['size'] != null) 'size': props['size'],
-        if (props['color'] != null) 'color': props['color'],
-      };
-      break;
+      return Icon(
+        _iconData(props['icon']),
+        size: _toDouble(props['size']),
+        color: _parseColor(props['color']),
+      );
     case STACComponentTypes.divider:
-      result = {'type': 'divider'};
-      break;
+      return const Divider(height: 1);
     case STACComponentTypes.textFormField:
     case STACComponentTypes.textarea:
-      result = _textFormField(node, props);
-      break;
+      return _buildTextFormField(node, props, formKey);
+    case STACComponentTypes.dropdown:
+      return _FormDropdownField(node: node, props: props, formKey: formKey);
+    case STACComponentTypes.checkbox:
+      return _FormCheckboxField(node: node, props: props, formKey: formKey);
+    case STACComponentTypes.radio:
+      return _FormRadioField(node: node, props: props, formKey: formKey);
+    case STACComponentTypes.switch_:
+      return _FormSwitchField(node: node, props: props, formKey: formKey);
+    case STACComponentTypes.slider:
+      return _FormSliderField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.button:
-      result = {
-        'type': 'elevatedButton',
-        'onPressed': _eventAction(node, STACEventTypes.onTap),
-        'child': {
-          'type': 'text',
-          'data': props['text']?.toString() ?? 'Button'
-        },
-      };
-      break;
+      return ElevatedButton(
+        onPressed: _buildTapHandler(
+          context,
+          node,
+          eventName: STACEventTypes.onTap,
+          onEvent: onEvent,
+          data: data,
+          formKey: formKey,
+        ),
+        child: Text(props['text']?.toString() ?? 'Button'),
+      );
     case STACComponentTypes.iconButton:
-      result = {
-        'type': 'iconButton',
-        'onPressed': _eventAction(node, STACEventTypes.onTap),
-        'icon': {'type': 'icon', 'icon': _iconName(props['icon'])},
-      };
-      break;
+      return IconButton(
+        onPressed: _buildTapHandler(
+          context,
+          node,
+          eventName: STACEventTypes.onTap,
+          onEvent: onEvent,
+          data: data,
+          formKey: formKey,
+        ),
+        icon: Icon(_iconData(props['icon'])),
+      );
     case STACComponentTypes.fab:
-      result = {
-        'type': 'floatingActionButton',
-        'onPressed': _eventAction(node, STACEventTypes.onTap),
-        'child': {'type': 'icon', 'icon': _iconName(props['icon'] ?? 'add')},
-      };
-      break;
+      return FloatingActionButton(
+        onPressed: _buildTapHandler(
+          context,
+          node,
+          eventName: STACEventTypes.onTap,
+          onEvent: onEvent,
+          data: data,
+          formKey: formKey,
+        ),
+        child: Icon(_iconData(props['icon'] ?? 'add')),
+      );
     case STACComponentTypes.listView:
-      result = {
-        'type': 'listView',
-        'shrinkWrap': true,
-        'children': children,
-      };
-      break;
+      return ListView(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: children,
+      );
     case STACComponentTypes.gridView:
-      result = {
-        'type': 'gridView',
-        'shrinkWrap': true,
-        'crossAxisCount': props['crossAxisCount'] ?? 2,
-        'mainAxisSpacing': props['spacing'] ?? props['mainAxisSpacing'] ?? 8,
-        'crossAxisSpacing': props['spacing'] ?? props['crossAxisSpacing'] ?? 8,
-        'childAspectRatio': props['childAspectRatio'] ?? 1,
-        'children': children,
-      };
-      break;
+      return GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: _toInt(props['crossAxisCount']) ?? 2,
+        mainAxisSpacing: _toDouble(props['spacing']) ??
+            _toDouble(props['mainAxisSpacing']) ??
+            8,
+        crossAxisSpacing: _toDouble(props['spacing']) ??
+            _toDouble(props['crossAxisSpacing']) ??
+            8,
+        childAspectRatio: _toDouble(props['childAspectRatio']) ?? 1,
+        children: children,
+      );
     case STACComponentTypes.card:
-      result = {
-        'type': 'card',
-        'child': _padding(16, _column(children)),
-      };
-      break;
-    case STACComponentTypes.scaffold:
-      result = {
-        'type': 'scaffold',
-        'body': _column(children),
-      };
-      break;
-    case STACComponentTypes.appBar:
-      result = {
-        'type': 'appBar',
-        'title': {'type': 'text', 'data': props['title']?.toString() ?? ''},
-      };
-      break;
+      return Card(
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _vertical(children),
+        ),
+      );
     default:
-      result = {'type': 'sizedBox'};
+      return const SizedBox.shrink();
   }
-
-  result = _applyStyle(result, style);
-
-  if (_hasTapEvent(node) &&
-      type != STACComponentTypes.button &&
-      type != STACComponentTypes.iconButton &&
-      type != STACComponentTypes.fab) {
-    result = {
-      'type': 'gestureDetector',
-      'onTap': _eventAction(node, STACEventTypes.onTap),
-      'child': result,
-    };
-  }
-
-  return result;
 }
 
-Map<String, dynamic> _layoutToOfficialStacJson(
-  Map<String, dynamic> layout,
-  List<Map<String, dynamic>> children,
-) {
-  final padding = _edgeInsets(layout['padding']);
-  Map<String, dynamic> result;
+Widget _buildPage(Map<String, dynamic> schema, List<Widget> children) {
+  final title = schema['title']?.toString();
+  return Scaffold(
+    appBar: title == null ? null : AppBar(title: Text(title)),
+    body: _buildLayout(schema['layout'] as Map?, children),
+  );
+}
 
-  switch (layout['type'] as String?) {
+Widget _buildLayout(Map<dynamic, dynamic>? layout, List<Widget> children) {
+  if (layout == null) return _vertical(children);
+
+  final props = Map<String, dynamic>.from(layout);
+  Widget result;
+  switch (props['type']?.toString()) {
     case 'row':
-      result = {
-        'type': 'row',
-        if (layout['mainAxisAlignment'] != null)
-          'mainAxisAlignment': layout['mainAxisAlignment'],
-        if (layout['crossAxisAlignment'] != null)
-          'crossAxisAlignment': layout['crossAxisAlignment'],
-        if (layout['spacing'] != null) 'spacing': layout['spacing'],
-        'children': children,
-      };
+      result = _buildRow(children, props);
       break;
     case 'grid':
-      result = {
-        'type': 'gridView',
-        'shrinkWrap': true,
-        'crossAxisCount': layout['crossAxisCount'] ?? 2,
-        'mainAxisSpacing': layout['spacing'] ?? 8,
-        'crossAxisSpacing': layout['runSpacing'] ?? layout['spacing'] ?? 8,
-        'childAspectRatio': layout['aspectRatio'] ?? 1,
-        'children': children,
-      };
+      result = GridView.count(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisCount: _toInt(props['crossAxisCount']) ?? 2,
+        mainAxisSpacing: _toDouble(props['spacing']) ?? 8,
+        crossAxisSpacing:
+            _toDouble(props['runSpacing']) ?? _toDouble(props['spacing']) ?? 8,
+        childAspectRatio: _toDouble(props['aspectRatio']) ?? 1,
+        children: children,
+      );
       break;
     case 'stack':
-      result = {'type': 'stack', 'children': children};
+      result = Stack(children: children);
       break;
     case 'column':
     default:
-      result = {
-        'type': 'column',
-        if (layout['mainAxisAlignment'] != null)
-          'mainAxisAlignment': layout['mainAxisAlignment'],
-        if (layout['crossAxisAlignment'] != null)
-          'crossAxisAlignment': layout['crossAxisAlignment'],
-        if (layout['spacing'] != null) 'spacing': layout['spacing'],
-        'children': children,
-      };
+      result = _buildColumn(children, props);
+      break;
   }
 
+  final padding = _edgeInsets(props['padding']);
   if (padding != null) {
-    result = {'type': 'padding', 'padding': padding, 'child': result};
+    result = Padding(padding: padding, child: result);
   }
 
-  if (layout['scrollable'] == true) {
-    result = {'type': 'singleChildScrollView', 'child': result};
+  if (props['scrollable'] == true) {
+    result = SingleChildScrollView(child: result);
   }
 
   return result;
 }
 
-Map<String, dynamic> _textFormField(
+Widget _buildContainer(List<Widget> children, Map<String, dynamic> props) {
+  final child = children.isEmpty
+      ? const SizedBox.shrink()
+      : children.length == 1
+          ? children.first
+          : _vertical(children);
+
+  return Container(
+    width: _toDouble(props['width']),
+    height: _toDouble(props['height']),
+    alignment: _alignment(props['alignment']),
+    padding: _edgeInsets(props['padding']),
+    margin: _edgeInsets(props['margin']),
+    decoration: _boxDecoration(props),
+    child: child,
+  );
+}
+
+Widget _buildColumn(List<Widget> children, Map<String, dynamic> props) {
+  return Column(
+    mainAxisAlignment: _mainAxisAlignment(props['mainAxisAlignment']),
+    crossAxisAlignment: _crossAxisAlignment(props['crossAxisAlignment']) ??
+        CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: _withSpacing(children, _toDouble(props['spacing'])),
+  );
+}
+
+Widget _buildRow(List<Widget> children, Map<String, dynamic> props) {
+  return Row(
+    mainAxisAlignment: _mainAxisAlignment(props['mainAxisAlignment']),
+    crossAxisAlignment: _crossAxisAlignment(props['crossAxisAlignment']) ??
+        CrossAxisAlignment.center,
+    children:
+        _withSpacing(children, _toDouble(props['spacing']), horizontal: true),
+  );
+}
+
+Widget _buildText(Map<String, dynamic> props, Map<dynamic, dynamic>? style) {
+  final text = props['text']?.toString() ?? '';
+  final textStyle = TextStyle(
+    fontSize: _toDouble(style?['fontSize']),
+    color: _parseColor(style?['color']),
+    fontWeight: _fontWeight(style?['fontWeight']),
+    decoration: _textDecoration(style?['textDecoration']),
+  );
+
+  return Text(
+    text,
+    textAlign: _textAlign(style?['textAlign']),
+    maxLines: _toInt(style?['maxLines']),
+    overflow: _overflow(style?['overflow']),
+    style: textStyle,
+  );
+}
+
+Widget _buildImage(Map<String, dynamic> props) {
+  final src = props['src']?.toString();
+  if (src == null || src.isEmpty) {
+    return const SizedBox.shrink();
+  }
+  final image = src.startsWith('http') ? Image.network(src) : Image.asset(src);
+  return SizedBox(
+    width: _toDouble(props['width']),
+    height: _toDouble(props['height']),
+    child: FittedBox(
+      fit: _boxFit(props['fit']) ?? BoxFit.cover,
+      child: image,
+    ),
+  );
+}
+
+Widget _buildTextFormField(
   Map<String, dynamic> node,
   Map<String, dynamic> props,
+  STACFormKey? formKey,
 ) {
-  final id = node['id'] as String?;
-  return {
-    'type': 'textFormField',
-    if (id != null) 'id': id,
-    'decoration': {
-      if (props['label'] != null) 'labelText': props['label'],
-      if (props['hint'] != null) 'hintText': props['hint'],
-    },
-    if (props['obscure'] != null) 'obscureText': props['obscure'],
-    if (props['enabled'] != null) 'enabled': props['enabled'],
-    if (props['maxLines'] != null) 'maxLines': props['maxLines'],
-    if (props['minLines'] != null) 'minLines': props['minLines'],
-    if (props['keyboardType'] != null)
-      'keyboardType': _keyboardType(props['keyboardType']),
+  final id = node['id']?.toString();
+  final initialValue = props['initialValue'] ?? props['value'];
+  if (id != null && initialValue != null && formKey?.getValue(id) == null) {
+    formKey?.setValue(id, initialValue);
+  }
+  return TextFormField(
+    initialValue: initialValue?.toString(),
+    decoration: InputDecoration(
+      labelText: props['label']?.toString(),
+      hintText: props['hint']?.toString(),
+    ),
+    obscureText: props['obscure'] == true,
+    enabled: props['enabled'] != false,
+    maxLines: _toInt(props['maxLines']) ??
+        (_isTextarea(node['type']?.toString()) ? 4 : 1),
+    minLines: _toInt(props['minLines']),
+    keyboardType: _keyboardType(props['keyboardType']),
+    onChanged: id == null
+        ? null
+        : (value) {
+            formKey?.setValue(id, value);
+          },
+    onSaved: id == null
+        ? null
+        : (value) {
+            formKey?.setValue(id, value);
+          },
+  );
+}
+
+bool _isTextarea(String? type) => type == STACComponentTypes.textarea;
+
+class _FormDropdownField extends StatefulWidget {
+  const _FormDropdownField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormDropdownField> createState() => _FormDropdownFieldState();
+}
+
+class _FormDropdownFieldState extends State<_FormDropdownField> {
+  String? _value;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    final initial =
+        _initialFormValue(widget.node, widget.props, widget.formKey);
+    _value = initial?.toString();
+    if (id != null && _value != null) {
+      widget.formKey?.setValue(id, _value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    final options = _formOptions(widget.props['options']);
+
+    return DropdownButtonFormField<String>(
+      value: options.any((option) => option.value == _value) ? _value : null,
+      decoration: InputDecoration(
+        labelText: widget.props['label']?.toString(),
+        hintText: widget.props['hint']?.toString(),
+      ),
+      items: options
+          .map(
+            (option) => DropdownMenuItem<String>(
+              value: option.value,
+              child: Text(option.label),
+            ),
+          )
+          .toList(growable: false),
+      onChanged: widget.props['enabled'] == false
+          ? null
+          : (value) {
+              setState(() => _value = value);
+              if (id != null) {
+                widget.formKey?.setValue(id, value);
+              }
+            },
+    );
+  }
+}
+
+class _FormCheckboxField extends StatefulWidget {
+  const _FormCheckboxField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormCheckboxField> createState() => _FormCheckboxFieldState();
+}
+
+class _FormCheckboxFieldState extends State<_FormCheckboxField> {
+  late bool _value;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    _value =
+        _toBool(_initialFormValue(widget.node, widget.props, widget.formKey));
+    if (id != null) {
+      widget.formKey?.setValue(id, _value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    return CheckboxListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(widget.props['label']?.toString() ?? ''),
+      subtitle: widget.props['hint'] == null
+          ? null
+          : Text(widget.props['hint'].toString()),
+      value: _value,
+      onChanged: widget.props['enabled'] == false
+          ? null
+          : (value) {
+              setState(() => _value = value ?? false);
+              if (id != null) {
+                widget.formKey?.setValue(id, _value);
+              }
+            },
+    );
+  }
+}
+
+class _FormSwitchField extends StatefulWidget {
+  const _FormSwitchField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormSwitchField> createState() => _FormSwitchFieldState();
+}
+
+class _FormSwitchFieldState extends State<_FormSwitchField> {
+  late bool _value;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    _value =
+        _toBool(_initialFormValue(widget.node, widget.props, widget.formKey));
+    if (id != null) {
+      widget.formKey?.setValue(id, _value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(widget.props['label']?.toString() ?? ''),
+      subtitle: widget.props['hint'] == null
+          ? null
+          : Text(widget.props['hint'].toString()),
+      value: _value,
+      onChanged: widget.props['enabled'] == false
+          ? null
+          : (value) {
+              setState(() => _value = value);
+              if (id != null) {
+                widget.formKey?.setValue(id, _value);
+              }
+            },
+    );
+  }
+}
+
+class _FormRadioField extends StatefulWidget {
+  const _FormRadioField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormRadioField> createState() => _FormRadioFieldState();
+}
+
+class _FormRadioFieldState extends State<_FormRadioField> {
+  String? _value;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    final initial =
+        _initialFormValue(widget.node, widget.props, widget.formKey);
+    _value = initial?.toString();
+    if (id != null && _value != null) {
+      widget.formKey?.setValue(id, _value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    final options = _formOptions(widget.props['options']);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.props['label'] != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(widget.props['label'].toString()),
+          ),
+        ...options.map(
+          (option) => RadioListTile<String>(
+            contentPadding: EdgeInsets.zero,
+            title: Text(option.label),
+            value: option.value,
+            groupValue: _value,
+            onChanged: widget.props['enabled'] == false
+                ? null
+                : (value) {
+                    setState(() => _value = value);
+                    if (id != null) {
+                      widget.formKey?.setValue(id, value);
+                    }
+                  },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FormSliderField extends StatefulWidget {
+  const _FormSliderField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormSliderField> createState() => _FormSliderFieldState();
+}
+
+class _FormSliderFieldState extends State<_FormSliderField> {
+  late double _value;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    _value = _toDouble(
+            _initialFormValue(widget.node, widget.props, widget.formKey)) ??
+        _toDouble(widget.props['min']) ??
+        0;
+    if (id != null) {
+      widget.formKey?.setValue(id, _value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    final min = _toDouble(widget.props['min']) ?? 0;
+    final max = _toDouble(widget.props['max']) ?? 100;
+    final divisions = _toInt(widget.props['divisions']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.props['label'] != null)
+          Text('${widget.props['label']}: ${_value.round()}'),
+        Slider(
+          value: _value.clamp(min, max),
+          min: min,
+          max: max,
+          divisions: divisions,
+          label: _value.round().toString(),
+          onChanged: widget.props['enabled'] == false
+              ? null
+              : (value) {
+                  setState(() => _value = value);
+                  if (id != null) {
+                    widget.formKey?.setValue(id, value);
+                  }
+                },
+        ),
+      ],
+    );
+  }
+}
+
+class _FormOption {
+  const _FormOption({required this.label, required this.value});
+
+  final String label;
+  final String value;
+}
+
+List<_FormOption> _formOptions(dynamic value) {
+  if (value is! List) return const [];
+  return value.map((item) {
+    if (item is Map) {
+      final map = Map<String, dynamic>.from(item);
+      final rawValue = map['value'] ?? map['id'] ?? map['label'];
+      return _FormOption(
+        label: (map['label'] ?? rawValue ?? '').toString(),
+        value: (rawValue ?? '').toString(),
+      );
+    }
+    return _FormOption(label: item.toString(), value: item.toString());
+  }).toList(growable: false);
+}
+
+dynamic _initialFormValue(
+  Map<String, dynamic> node,
+  Map<String, dynamic> props,
+  STACFormKey? formKey,
+) {
+  final id = node['id']?.toString();
+  if (id != null && formKey?.getValue(id) != null) {
+    return formKey?.getValue(id);
+  }
+  return props['initialValue'] ?? props['value'];
+}
+
+bool _toBool(dynamic value) {
+  if (value is bool) return value;
+  final text = value?.toString().toLowerCase();
+  return text == 'true' || text == '1' || text == 'yes';
+}
+
+bool _shouldWrapTap(String type, Map<String, dynamic> node) {
+  if (_eventHandlerName(node, STACEventTypes.onTap) == null) return false;
+  return type != STACComponentTypes.button &&
+      type != STACComponentTypes.iconButton &&
+      type != STACComponentTypes.fab;
+}
+
+VoidCallback? _buildTapHandler(
+  BuildContext context,
+  Map<String, dynamic> node, {
+  required String eventName,
+  required STACEventHandler? onEvent,
+  required Map<String, dynamic> data,
+  required STACFormKey? formKey,
+}) {
+  final handler = _eventHandlerName(node, eventName);
+  if (handler == null) return null;
+
+  return () {
+    unawaited(onEvent?.call(handler, {
+      'nodeId': node['id'],
+      'eventType': eventName,
+      'handler': handler,
+      'props': Map<String, dynamic>.from(node['props'] as Map? ?? const {}),
+      'currentData': data,
+      'form': formKey?.getValues() ?? const <String, dynamic>{},
+    }));
   };
 }
 
-Map<String, dynamic> _applyStyle(
-  Map<String, dynamic> widget,
-  Map<dynamic, dynamic>? style,
-) {
-  if (style == null || style.isEmpty) return widget;
+String? _eventHandlerName(Map<String, dynamic> node, String eventName) {
+  final events = Map<String, dynamic>.from(node['events'] as Map? ?? const {});
+  final handler = events[eventName];
+  return handler?.toString();
+}
 
-  var result = widget;
+List<Widget> _withSpacing(
+  List<Widget> children,
+  double? spacing, {
+  bool horizontal = false,
+}) {
+  if (spacing == null || children.length < 2) return children;
+  final gap = SizedBox(
+    width: horizontal ? spacing : 0,
+    height: horizontal ? 0 : spacing,
+  );
+  return children
+      .expandIndexed((index, child) =>
+          index == children.length - 1 ? [child] : [child, gap])
+      .toList(growable: false);
+}
+
+Widget _vertical(List<Widget> children) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: children,
+  );
+}
+
+Widget _applyNodeStyle(Widget child, Map<String, dynamic> style) {
   final padding = _edgeInsets(style['padding']);
-  if (padding != null) {
-    result = {'type': 'padding', 'padding': padding, 'child': result};
-  }
-
-  final width = style['width'];
-  final height = style['height'];
-  if (width != null || height != null) {
-    result = {
-      'type': 'sizedBox',
-      if (width != null) 'width': width,
-      if (height != null) 'height': height,
-      'child': result,
-    };
-  }
-
   final margin = _edgeInsets(style['margin']);
-  final backgroundColor = style['backgroundColor'];
-  final borderRadius = style['borderRadius'];
-  if (margin != null || backgroundColor != null || borderRadius != null) {
-    result = {
-      'type': 'container',
-      if (margin != null) 'margin': margin,
-      if (backgroundColor != null && borderRadius == null)
-        'color': backgroundColor,
-      if (borderRadius != null)
-        'decoration': {
-          'color': backgroundColor,
-          'borderRadius': borderRadius,
-        },
-      'child': result,
-    };
+  final width = _toDouble(style['width']);
+  final height = _toDouble(style['height']);
+  final bg = _parseColor(style['backgroundColor']);
+  final borderRadius = _toDouble(style['borderRadius']);
+
+  Widget result = child;
+
+  if (padding != null) {
+    result = Padding(padding: padding, child: result);
+  }
+
+  if (width != null || height != null) {
+    result = SizedBox(width: width, height: height, child: result);
+  }
+
+  if (margin != null || bg != null || borderRadius != null) {
+    result = Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius:
+            borderRadius == null ? null : BorderRadius.circular(borderRadius),
+      ),
+      child: result,
+    );
+  }
+
+  if (style['onTap'] != null) {
+    result =
+        GestureDetector(onTap: style['onTap'] as VoidCallback?, child: result);
   }
 
   return result;
 }
 
-Map<String, dynamic> _textStyle(Map<dynamic, dynamic>? style) {
-  if (style == null) return const {};
-  final fontWeight = _fontWeight(style['fontWeight']);
-  final copyWithStyle = <String, dynamic>{
-    if (style['color'] != null) 'color': style['color'],
-    if (style['fontSize'] != null) 'fontSize': style['fontSize'],
-    if (fontWeight != null) 'fontWeight': fontWeight,
-  };
-  return {
-    if (copyWithStyle.isNotEmpty) 'copyWithStyle': copyWithStyle,
-    if (style['textAlign'] != null) 'textAlign': style['textAlign'],
-    if (style['maxLines'] != null) 'maxLines': style['maxLines'],
-    if (style['overflow'] != null) 'overflow': style['overflow'],
-  };
+BoxDecoration? _boxDecoration(Map<String, dynamic> props) {
+  final color =
+      _parseColor(props['backgroundColor']) ?? _parseColor(props['color']);
+  final borderRadius = _toDouble(props['borderRadius']);
+  final border = _border(props['border']);
+  final boxShadow = _boxShadow(props['boxShadow']);
+  if (color == null &&
+      borderRadius == null &&
+      border == null &&
+      boxShadow == null) {
+    return null;
+  }
+  return BoxDecoration(
+    color: color,
+    borderRadius:
+        borderRadius == null ? null : BorderRadius.circular(borderRadius),
+    border: border,
+    boxShadow: boxShadow,
+  );
 }
 
-String? _fontWeight(dynamic value) {
+Border? _border(dynamic value) {
   if (value == null) return null;
-  if (value is num) return _numericFontWeight(value.toInt());
-
-  final text = value.toString().trim();
-  if (text.isEmpty) return null;
-
-  final lower = text.toLowerCase();
-  if (lower == 'normal' || lower == 'bold') return lower;
-
-  final normalized = lower.startsWith('fontweight.')
-      ? lower.substring('fontweight.'.length)
-      : lower;
-  if (_isSupportedFontWeight(normalized)) return normalized;
-
-  final numeric = int.tryParse(normalized);
-  return numeric == null ? text : _numericFontWeight(numeric);
+  if (value is Border) return value;
+  return null;
 }
 
-String _numericFontWeight(int value) {
-  final clamped = value.clamp(100, 900);
-  final rounded = (clamped / 100).round() * 100;
-  return 'w$rounded';
+List<BoxShadow>? _boxShadow(dynamic value) {
+  if (value == null) return null;
+  if (value is List<BoxShadow>) return value;
+  return null;
 }
 
-bool _isSupportedFontWeight(String value) {
-  switch (value) {
-    case 'w100':
-    case 'w200':
-    case 'w300':
-    case 'w400':
-    case 'w500':
-    case 'w600':
-    case 'w700':
-    case 'w800':
-    case 'w900':
-      return true;
+AlignmentGeometry? _alignment(dynamic value) {
+  switch (value?.toString()) {
+    case 'center':
+      return Alignment.center;
+    case 'topCenter':
+      return Alignment.topCenter;
+    case 'bottomCenter':
+      return Alignment.bottomCenter;
+    case 'centerLeft':
+      return Alignment.centerLeft;
+    case 'centerRight':
+      return Alignment.centerRight;
     default:
-      return false;
+      return null;
   }
 }
 
-Map<String, dynamic>? _eventAction(
-    Map<String, dynamic> node, String eventType) {
-  final events = node['events'] as Map?;
-  final handler = events?[eventType] as String?;
-  if (handler == null) return null;
-
-  return {
-    'actionType': 'pluginEvent',
-    'eventName': handler,
-    'params': {
-      'nodeId': node['id'],
-      'eventType': eventType,
-      'handler': handler,
-      'props': Map<String, dynamic>.from(node['props'] as Map? ?? const {}),
-    },
-  };
+MainAxisAlignment _mainAxisAlignment(dynamic value) {
+  switch (value?.toString()) {
+    case 'center':
+      return MainAxisAlignment.center;
+    case 'end':
+      return MainAxisAlignment.end;
+    case 'spaceBetween':
+      return MainAxisAlignment.spaceBetween;
+    case 'spaceAround':
+      return MainAxisAlignment.spaceAround;
+    case 'spaceEvenly':
+      return MainAxisAlignment.spaceEvenly;
+    case 'start':
+    default:
+      return MainAxisAlignment.start;
+  }
 }
 
-bool _hasTapEvent(Map<String, dynamic> node) {
-  final events = node['events'] as Map?;
-  return events?[STACEventTypes.onTap] != null;
+CrossAxisAlignment? _crossAxisAlignment(dynamic value) {
+  switch (value?.toString()) {
+    case 'start':
+      return CrossAxisAlignment.start;
+    case 'end':
+      return CrossAxisAlignment.end;
+    case 'stretch':
+      return CrossAxisAlignment.stretch;
+    case 'center':
+      return CrossAxisAlignment.center;
+    default:
+      return null;
+  }
 }
 
-Map<String, dynamic> _column(List<Map<String, dynamic>> children) {
-  return {'type': 'column', 'children': children};
+TextAlign _textAlign(dynamic value) {
+  switch (value?.toString()) {
+    case 'center':
+      return TextAlign.center;
+    case 'end':
+      return TextAlign.end;
+    case 'right':
+      return TextAlign.right;
+    case 'justify':
+      return TextAlign.justify;
+    case 'left':
+    default:
+      return TextAlign.left;
+  }
 }
 
-Map<String, dynamic> _padding(num value, Map<String, dynamic> child) {
-  return {'type': 'padding', 'padding': value, 'child': child};
+TextOverflow? _overflow(dynamic value) {
+  switch (value?.toString()) {
+    case 'clip':
+      return TextOverflow.clip;
+    case 'fade':
+      return TextOverflow.fade;
+    case 'ellipsis':
+      return TextOverflow.ellipsis;
+    case 'visible':
+      return TextOverflow.visible;
+    default:
+      return null;
+  }
 }
 
-Map<String, dynamic> _empty() {
-  return {'type': 'sizedBox'};
+TextDecoration? _textDecoration(dynamic value) {
+  switch (value?.toString()) {
+    case 'underline':
+      return TextDecoration.underline;
+    case 'lineThrough':
+      return TextDecoration.lineThrough;
+    case 'overline':
+      return TextDecoration.overline;
+    default:
+      return null;
+  }
 }
 
-dynamic _edgeInsets(dynamic value) {
+FontWeight? _fontWeight(dynamic value) {
+  final text = value?.toString().toLowerCase();
+  switch (text) {
+    case '100':
+    case 'w100':
+      return FontWeight.w100;
+    case '200':
+    case 'w200':
+      return FontWeight.w200;
+    case '300':
+    case 'w300':
+      return FontWeight.w300;
+    case '400':
+    case 'normal':
+    case 'w400':
+      return FontWeight.w400;
+    case '500':
+    case 'w500':
+      return FontWeight.w500;
+    case '600':
+    case 'w600':
+      return FontWeight.w600;
+    case '700':
+    case 'bold':
+    case 'w700':
+      return FontWeight.w700;
+    case '800':
+    case 'w800':
+      return FontWeight.w800;
+    case '900':
+    case 'w900':
+      return FontWeight.w900;
+    default:
+      return null;
+  }
+}
+
+Color? _parseColor(dynamic value) {
   if (value == null) return null;
-  if (value is num || value is Map || value is List) return value;
+  if (value is int) return Color(value);
+  final text = value.toString().trim();
+  if (text.isEmpty) return null;
+  if (text.startsWith('#')) {
+    final hex = text.substring(1);
+    final normalized = hex.length == 6 ? 'FF$hex' : hex;
+    return Color(int.parse(normalized, radix: 16));
+  }
+  return null;
+}
+
+double? _toDouble(dynamic value) {
+  if (value is double) return value;
+  if (value is int) return value.toDouble();
+  return double.tryParse(value?.toString() ?? '');
+}
+
+int? _toInt(dynamic value) {
+  if (value is int) return value;
+  if (value is double) return value.toInt();
+  return int.tryParse(value?.toString() ?? '');
+}
+
+EdgeInsetsGeometry? _edgeInsets(dynamic value) {
+  if (value == null) return null;
+  if (value is EdgeInsetsGeometry) return value;
+  if (value is List && value.length == 4) {
+    final parts = value.map((e) => _toDouble(e) ?? 0).toList(growable: false);
+    return EdgeInsets.fromLTRB(parts[0], parts[1], parts[2], parts[3]);
+  }
   if (value is String) {
     final parts = value
         .split(',')
         .map((part) => double.tryParse(part.trim()))
         .toList(growable: false);
     if (parts.length == 4 && !parts.any((part) => part == null)) {
-      return parts.cast<double>();
+      return EdgeInsets.fromLTRB(
+        parts[0]!,
+        parts[1]!,
+        parts[2]!,
+        parts[3]!,
+      );
     }
   }
   return null;
 }
 
-String _iconName(dynamic value) {
-  final name = value?.toString() ?? 'help_outline';
-  return name.startsWith('Icons.') ? name.substring(6) : name;
+IconData _iconData(dynamic value) {
+  switch (value?.toString()) {
+    case 'Icons.today':
+      return Icons.today;
+    case 'Icons.event':
+      return Icons.event;
+    case 'Icons.chevron_left':
+      return Icons.chevron_left;
+    case 'Icons.chevron_right':
+      return Icons.chevron_right;
+    case 'Icons.add':
+      return Icons.add;
+    case 'Icons.check':
+      return Icons.check;
+    case 'Icons.info':
+      return Icons.info;
+    case 'Icons.calendar_month':
+      return Icons.calendar_month;
+    default:
+      return Icons.help_outline;
+  }
 }
 
-String _keyboardType(dynamic value) {
+BoxFit? _boxFit(dynamic value) {
+  switch (value?.toString()) {
+    case 'contain':
+      return BoxFit.contain;
+    case 'cover':
+      return BoxFit.cover;
+    case 'fill':
+      return BoxFit.fill;
+    case 'fitWidth':
+      return BoxFit.fitWidth;
+    case 'fitHeight':
+      return BoxFit.fitHeight;
+    default:
+      return null;
+  }
+}
+
+TextInputType? _keyboardType(dynamic value) {
   switch (value?.toString()) {
     case 'email':
-      return 'emailAddress';
+    case 'emailAddress':
+      return TextInputType.emailAddress;
     case 'phone':
-      return 'phone';
+      return TextInputType.phone;
     case 'number':
-      return 'number';
+      return TextInputType.number;
     case 'url':
-      return 'url';
+      return TextInputType.url;
     case 'multiline':
-      return 'multiline';
+      return TextInputType.multiline;
     case 'text':
+      return TextInputType.text;
     default:
-      return 'text';
+      return null;
   }
 }
 

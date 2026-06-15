@@ -5,19 +5,28 @@
   "version": "1.0.0",
   "publisher": "company",
   "type": "js",
-  "platforms": ["ios", "android", "windows", "macos", "linux"],
+  "platforms": [
+    "ios",
+    "android",
+    "windows",
+    "macos",
+    "linux"
+  ],
   "minHostVersion": "1.0.0",
   "engine": {
     "runtime": "quickjs",
     "bundle": "dist/bundle.js",
-    "bundleHash": "",
-    "bundleSize": 21128,
+    "bundleHash": "337445251b6985fabcc41076ef4340effa30e4f6cfd014b0520c87b3bec774cc",
+    "bundleSize": 31021,
     "entryFunction": "onActivate",
     "memoryLimitMb": 16,
     "executionTimeoutMs": 5000,
     "background": false
   },
-  "activationEvents": ["onCommand:calendar.open", "onEvent:approval.created"],
+  "activationEvents": [
+    "onCommand:calendar.open",
+    "onEvent:approval.created"
+  ],
   "permissions": [
     "storage.local",
     "toast.show",
@@ -29,12 +38,16 @@
     {
       "id": "calendar.event.get",
       "type": "data",
-      "permissions": ["calendar.read"]
+      "permissions": [
+        "calendar.read"
+      ]
     },
     {
       "id": "calendar.event.create",
       "type": "action",
-      "permissions": ["calendar.write"]
+      "permissions": [
+        "calendar.write"
+      ]
     }
   ],
   "stac": {

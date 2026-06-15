@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:core/core.dart';
 import 'capability_registry.dart';
+import 'capabilities/business_capabilities.dart';
 import 'permission_checker.dart';
 
 /// Host Bridge 实现
@@ -131,6 +132,53 @@ class HostBridge {
       id: 'notification.send',
       handler: _sendNotification,
       requiredPermissions: ['notification.send'],
+    ));
+
+    // ===== 组织 / IM / 审批能力 =====
+    _registry.register(AccountCapabilities.searchContacts(
+      handler: _searchContacts,
+    ));
+    _registry.register(AccountCapabilities.getContactById(
+      handler: _getContactById,
+    ));
+    _registry.register(AccountCapabilities.pickContacts(
+      handler: _pickContacts,
+    ));
+    _registry.register(AccountCapabilities.getDepartments(
+      handler: _getDepartments,
+    ));
+    _registry.register(ApprovalCapabilities.getApprovalList(
+      handler: _getApprovalList,
+    ));
+    _registry.register(ApprovalCapabilities.getApprovalDetail(
+      handler: _getApprovalDetail,
+    ));
+    _registry.register(ApprovalCapabilities.submitApproval(
+      handler: _submitApproval,
+    ));
+    _registry.register(ApprovalCapabilities.getApprovalHistory(
+      handler: _getApprovalHistory,
+    ));
+    _registry.register(ApprovalCapabilities.cancelApproval(
+      handler: _cancelApproval,
+    ));
+    _registry.register(ApprovalCapabilities.forwardApproval(
+      handler: _forwardApproval,
+    ));
+    _registry.register(NotificationCapabilities.sendNotification(
+      handler: _sendNotification,
+    ));
+    _registry.register(NotificationCapabilities.cancelNotification(
+      handler: _cancelNotification,
+    ));
+    _registry.register(NotificationCapabilities.setBadge(
+      handler: _setBadge,
+    ));
+    _registry.register(NotificationCapabilities.getNotifications(
+      handler: _getNotifications,
+    ));
+    _registry.register(NotificationCapabilities.markAsRead(
+      handler: _markNotificationAsRead,
     ));
   }
 
@@ -408,6 +456,191 @@ class HostBridge {
     // 需要使用 flutter_local_notifications
 
     return {'sent': true, 'title': title, 'body': body};
+  }
+
+  Future<Map<String, dynamic>> _searchContacts(
+    Map<String, dynamic> params,
+  ) async {
+    final keyword = (params['keyword'] as String? ?? '').trim().toLowerCase();
+    final allContacts = _mockContacts();
+    final matched = allContacts.where((contact) {
+      if (keyword.isEmpty) return true;
+      return contact['name'].toString().toLowerCase().contains(keyword) ||
+          contact['department'].toString().toLowerCase().contains(keyword) ||
+          contact['imId'].toString().toLowerCase().contains(keyword);
+    }).toList(growable: false);
+    return {'items': matched, 'total': matched.length};
+  }
+
+  Future<Map<String, dynamic>> _getContactById(
+    Map<String, dynamic> params,
+  ) async {
+    final id = params['id']?.toString();
+    final contact = _mockContacts().firstWhere(
+      (item) => item['id'].toString() == id,
+      orElse: () => <String, dynamic>{},
+    );
+    return {'item': contact};
+  }
+
+  Future<Map<String, dynamic>> _pickContacts(
+    Map<String, dynamic> params,
+  ) async {
+    final selectedIds =
+        (params['selectedIds'] as List?)?.map((e) => e.toString()).toList() ??
+            const [];
+    final multiple = params['multiple'] != false;
+    final contacts = _mockContacts();
+    final picked = contacts
+        .where((contact) =>
+            selectedIds.isEmpty ||
+            selectedIds.contains(contact['id'].toString()))
+        .take(multiple ? contacts.length : 1)
+        .toList(growable: false);
+    return {
+      'items': picked.isNotEmpty
+          ? picked
+          : contacts.take(multiple ? 3 : 1).toList(growable: false),
+      'multiple': multiple,
+    };
+  }
+
+  Future<Map<String, dynamic>> _getDepartments() async {
+    return {
+      'items': [
+        {'id': 'dept_product', 'name': '产品部'},
+        {'id': 'dept_engineering', 'name': '研发部'},
+        {'id': 'dept_hr', 'name': '人事部'},
+      ]
+    };
+  }
+
+  Future<Map<String, dynamic>> _getApprovalList(
+    Map<String, dynamic> params,
+  ) async {
+    return {
+      'items': [
+        {
+          'id': 'apr_1001',
+          'title': '合同审批',
+          'status': 'pending',
+          'owner': '法务',
+        },
+        {
+          'id': 'apr_1002',
+          'title': '差旅报销',
+          'status': 'approved',
+          'owner': '财务',
+        }
+      ]
+    };
+  }
+
+  Future<Map<String, dynamic>> _getApprovalDetail(
+    Map<String, dynamic> params,
+  ) async {
+    final id = params['id']?.toString() ?? 'apr_1001';
+    return {
+      'item': {
+        'id': id,
+        'title': '合同审批',
+        'status': 'pending',
+        'steps': [
+          {'name': '提交', 'state': 'done'},
+          {'name': '法务审核', 'state': 'current'},
+          {'name': '归档', 'state': 'todo'},
+        ]
+      }
+    };
+  }
+
+  Future<Map<String, dynamic>> _submitApproval(
+    Map<String, dynamic> params,
+  ) async {
+    return {'submitted': true, 'payload': params};
+  }
+
+  Future<Map<String, dynamic>> _getApprovalHistory(
+    Map<String, dynamic> params,
+  ) async {
+    return {
+      'items': [
+        {'action': 'submitted', 'at': DateTime.now().toIso8601String()},
+        {'action': 'approved', 'at': DateTime.now().toIso8601String()},
+      ]
+    };
+  }
+
+  Future<Map<String, dynamic>> _cancelApproval(
+    Map<String, dynamic> params,
+  ) async {
+    return {'cancelled': true, 'payload': params};
+  }
+
+  Future<Map<String, dynamic>> _forwardApproval(
+    Map<String, dynamic> params,
+  ) async {
+    return {'forwarded': true, 'payload': params};
+  }
+
+  Future<Map<String, dynamic>> _cancelNotification(
+    Map<String, dynamic> params,
+  ) async {
+    return {'cancelled': true, 'payload': params};
+  }
+
+  Future<Map<String, dynamic>> _setBadge(Map<String, dynamic> params) async {
+    return {'badge': params['count'] ?? 0};
+  }
+
+  Future<Map<String, dynamic>> _getNotifications(
+    Map<String, dynamic> params,
+  ) async {
+    return {
+      'items': [
+        {'id': 'ntf_1', 'title': '待审批提醒', 'read': false},
+        {'id': 'ntf_2', 'title': '会议开始前 10 分钟', 'read': true},
+      ]
+    };
+  }
+
+  Future<Map<String, dynamic>> _markNotificationAsRead(
+    Map<String, dynamic> params,
+  ) async {
+    return {'marked': true, 'payload': params};
+  }
+
+  List<Map<String, dynamic>> _mockContacts() {
+    return const [
+      {
+        'id': 'u_1001',
+        'name': '张三',
+        'department': '产品部',
+        'imId': 'zhangsan',
+        'avatar': '',
+      },
+      {
+        'id': 'u_1002',
+        'name': '李四',
+        'department': '研发部',
+        'imId': 'lisi',
+        'avatar': '',
+      },
+      {
+        'id': 'u_1003',
+        'name': '王五',
+        'department': '法务部',
+        'imId': 'wangwu',
+        'avatar': '',
+      },
+      {
+        'id': 'u_1004',
+        'name': '赵敏',
+        'department': '财务部',
+        'imId': 'zhaomin',
+        'avatar': '',
+      },
+    ];
   }
 
   /// 获取当前 Context
