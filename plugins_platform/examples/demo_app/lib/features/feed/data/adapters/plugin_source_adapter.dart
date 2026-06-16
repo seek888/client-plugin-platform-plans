@@ -23,7 +23,7 @@ class PluginSourceAdapter implements DataSourceAdapter {
   @override
   Future<Either<Failure, ParsedFeed>> fetchFeedMetadata() async {
     return _call(() async {
-      final data = await _invokeMap('getFeedInfo', {
+      final data = await _invokeData('getFeedInfo', {
         'feedKey': config.feedKey,
         'provider': config.provider,
       });
@@ -44,10 +44,10 @@ class PluginSourceAdapter implements DataSourceAdapter {
     int page = 1,
     int pageSize = 20,
     DateTime? since,
-  }) async {
+    }) async {
     return _call(() async {
       final functionName = page <= 1 ? 'refresh' : 'loadMore';
-      final data = await _invokeMap(functionName, {
+      final data = await _invokeData(functionName, {
         'feedKey': config.feedKey,
         'provider': config.provider,
         'page': page,
@@ -71,7 +71,7 @@ class PluginSourceAdapter implements DataSourceAdapter {
     String articleId,
   ) async {
     return _call(() async {
-      final data = await _invokeMap('getArticleDetail', {
+      final data = await _invokeData('getArticleDetail', {
         'feedKey': config.feedKey,
         'articleId': articleId,
       });
@@ -82,7 +82,7 @@ class PluginSourceAdapter implements DataSourceAdapter {
   @override
   Future<Either<Failure, bool>> validateConnection() async {
     return _call(() async {
-      final data = await _invokeMap('getFeedInfo', {'feedKey': config.feedKey});
+      final data = await _invokeData('getFeedInfo', {'feedKey': config.feedKey});
       return data.isNotEmpty;
     }, operation: '验证插件数据源失败');
   }
@@ -113,7 +113,7 @@ class PluginSourceAdapter implements DataSourceAdapter {
     }
   }
 
-  Future<Map<String, dynamic>> _invokeMap(
+  Future<Map<String, dynamic>> _invokeData(
     String functionName,
     Map<String, dynamic> params,
   ) async {
@@ -122,11 +122,23 @@ class PluginSourceAdapter implements DataSourceAdapter {
       functionName,
       [params],
     );
-    if (result is Map<String, dynamic>) return result;
-    if (result is Map) {
-      return result.map((key, value) => MapEntry(key.toString(), value));
+    final payload = _unwrapInvokeResult(result);
+    if (payload is Map<String, dynamic>) return payload;
+    if (payload is Map) {
+      return payload.map((key, value) => MapEntry(key.toString(), value));
     }
     return <String, dynamic>{};
+  }
+
+  dynamic _unwrapInvokeResult(dynamic result) {
+    if (result is Map) {
+      final map = result.map((key, value) => MapEntry(key.toString(), value));
+      if (map['success'] == true && map.containsKey('data')) {
+        return map['data'];
+      }
+      return map;
+    }
+    return result;
   }
 
   List<ParsedArticle> _parseArticles(dynamic value) {

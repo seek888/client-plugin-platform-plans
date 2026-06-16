@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 /// 插件订阅源发现服务
 class PluginFeedDiscoveryService {
   static const providerCapability = 'rss.feed.provider';
+  static const discoveryMarkerKey = 'plugin.discovery';
 
   final PluginManager _pluginManager;
   final FeedDao _feedDao;
@@ -29,9 +30,13 @@ class PluginFeedDiscoveryService {
   Future<void> syncDiscoveredFeeds() async {
     if (_synced) return;
 
-    await _bootstrap.ensureInstalledAndActivated();
+    await _bootstrap.ensureReady();
+    await _pluginManager.ready;
 
-    final plugins = _pluginManager.getAllPlugins().where(
+    final plugins = _pluginManager
+        .getAllPlugins()
+        .where((plugin) => plugin.isActivated)
+        .where(
           (plugin) => plugin.manifest.capabilities.any(
             (capability) => capability.id == providerCapability,
           ),
@@ -47,6 +52,7 @@ class PluginFeedDiscoveryService {
         const [{}],
       );
       await _upsertDiscoveredFeeds(plugin.manifest.id, discovered);
+      await _cleanupDuplicateFeeds(plugin.manifest.id);
     }
 
     _synced = true;
@@ -86,6 +92,55 @@ class PluginFeedDiscoveryService {
         ),
       );
     }
+  }
+
+  Future<void> _cleanupDuplicateFeeds(String pluginId) async {
+    final feeds = await _feedDao.getAllFeeds();
+    final pluginFeeds = feeds.where(
+      (feed) =>
+          feed.sourceType == 'plugin' &&
+          feed.pluginId == pluginId &&
+          feed.pluginFeedKey == BuiltinPluginBootstrap.aiNewsDailyFeedKey,
+    ).toList(growable: false);
+
+    if (pluginFeeds.length <= 1) return;
+
+    final keep = pluginFeeds.first;
+    for (final feed in pluginFeeds.skip(1)) {
+      await _feedDao.deleteFeed(feed.id);
+    }
+
+    final companion = FeedsTableCompanion(
+      id: Value(keep.id),
+      url: Value(keep.url),
+      title: const Value(BuiltinPluginBootstrap.aiNewsDailyFeedTitle),
+      description: Value(keep.description),
+      iconUrl: Value(keep.iconUrl),
+      link: Value(keep.link),
+      categoryId: Value(keep.categoryId),
+      sortOrder: Value(keep.sortOrder),
+      unreadCount: Value(keep.unreadCount),
+      lastUpdated: Value(keep.lastUpdated),
+      lastFetched: Value(keep.lastFetched),
+      isEnabled: Value(keep.isEnabled),
+      isBlocked: Value(keep.isBlocked),
+      healthStatus: Value(keep.healthStatus),
+      failureCount: Value(keep.failureCount),
+      createdAt: Value(keep.createdAt),
+      updatedAt: Value(DateTime.now()),
+      sourceType: const Value('plugin'),
+      apiBaseUrl: const Value(null),
+      apiKey: const Value(null),
+      apiHeaders: const Value(null),
+      apiRemoteFeedId: const Value(null),
+      apiTimeout: const Value(30),
+      apiMaxRetries: const Value(3),
+      pluginId: Value(pluginId),
+      pluginFeedKey: const Value(BuiltinPluginBootstrap.aiNewsDailyFeedKey),
+      pluginProvider: const Value(providerCapability),
+    );
+
+    await _feedDao.updateFeed(companion);
   }
 
   List<Map<String, dynamic>> _normalizeFeeds(dynamic discovered) {

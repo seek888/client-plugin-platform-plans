@@ -39,8 +39,8 @@
   }
   async function loadMore(params) {
     const pageSize = Number(params && params.pageSize) || PAGE_SIZE;
-    const page = Math.max(Number(params && params.page) || 2, 2);
-    const startDate = addDays(today(), -(page - 1));
+    const nextCursor = normalizeDate(params && params.nextCursor);
+    const startDate = nextCursor || addDays(today(), -1);
     return fetchDateWindow(startDate, pageSize);
   }
   async function getArticleDetail(params) {
@@ -107,7 +107,7 @@
       const link = String(item.link || '');
       const publishedDate = normalizeDate(item.date) || date;
       return {
-        guid: `ai-news:${publishedDate}:${stableHash(title + link + index)}`,
+        guid: `ai-news:${publishedDate}:${stableHash(title + link)}`,
         title,
         summary: String(item.detail || ''),
         content: String(item.detail || ''),

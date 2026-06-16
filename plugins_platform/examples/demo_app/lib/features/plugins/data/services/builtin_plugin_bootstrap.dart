@@ -24,7 +24,7 @@ class BuiltinPluginBootstrap {
     required PluginManager pluginManager,
   }) : _pluginManager = pluginManager;
 
-  Future<void> ensureInstalledAndActivated() async {
+  Future<void> ensureInstalled() async {
     if (_bootstrapped) return;
 
     for (final plugin in _builtinPlugins) {
@@ -44,17 +44,13 @@ class BuiltinPluginBootstrap {
           bundleSource: bundle,
         );
       }
-
-      if (!_pluginManager.isActivated(plugin.pluginId)) {
-        await _pluginManager.activate(plugin.pluginId);
-      }
     }
 
     _bootstrapped = true;
   }
 
   Future<void> ensureReady() async {
-    await ensureInstalledAndActivated();
+    await ensureInstalled();
   }
 }
 
