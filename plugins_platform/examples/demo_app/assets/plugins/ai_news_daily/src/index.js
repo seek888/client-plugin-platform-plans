@@ -1,0 +1,148 @@
+const FEED_KEY = 'ai-news';
+const FEED_TITLE = 'AI 资讯快报';
+const FEED_DESCRIPTION = '提供 AI、大模型等领域的最新资讯。';
+const API_URL = 'https://60s.viki.moe/v2/ai-news';
+const PAGE_SIZE = 20;
+
+export function onActivate() {}
+
+export function onDeactivate() {}
+
+export function discoverFeeds() {
+  return {
+    feeds: [
+      {
+        feedKey: FEED_KEY,
+        provider: 'rss.feed.provider',
+        title: FEED_TITLE,
+        description: FEED_DESCRIPTION,
+        iconUrl: 'https://ai-bot.cn/favicon.ico',
+        link: 'https://ai-bot.cn/daily-ai-news'
+      }
+    ]
+  };
+}
+
+export function getFeedInfo() {
+  return {
+    feedKey: FEED_KEY,
+    title: FEED_TITLE,
+    description: FEED_DESCRIPTION,
+    iconUrl: 'https://ai-bot.cn/favicon.ico',
+    link: 'https://ai-bot.cn/daily-ai-news',
+    lastUpdated: new Date().toISOString()
+  };
+}
+
+export async function refresh(params) {
+  const pageSize = Number(params && params.pageSize) || PAGE_SIZE;
+  const firstDate = normalizeDate(params && params.date) || today();
+  return fetchDateWindow(firstDate, pageSize);
+}
+
+export async function loadMore(params) {
+  const pageSize = Number(params && params.pageSize) || PAGE_SIZE;
+  const page = Math.max(Number(params && params.page) || 2, 2);
+  const startDate = addDays(today(), -(page - 1));
+  return fetchDateWindow(startDate, pageSize);
+}
+
+export async function getArticleDetail(params) {
+  const articleId = params && params.articleId ? String(params.articleId) : '';
+  const date = articleId.split(':')[1] || today();
+  const result = await fetchNewsByDate(date);
+  const articles = mapArticles(result.news || [], result.date || date);
+  return articles.find((item) => item.guid === articleId) || articles[0] || {};
+}
+
+async function fetchDateWindow(startDate, pageSize) {
+  const articles = [];
+  let cursor = startDate;
+  let attempts = 0;
+
+  while (articles.length < pageSize && attempts < 14) {
+    const result = await fetchNewsByDate(cursor);
+    articles.push(...mapArticles(result.news || [], result.date || cursor));
+    cursor = addDays(cursor, -1);
+    attempts += 1;
+  }
+
+  return {
+    articles: articles.slice(0, pageSize),
+    hasMore: true,
+    nextCursor: cursor,
+    totalCount: articles.length
+  };
+}
+
+async function fetchNewsByDate(date) {
+  const response = await invokeHost('network.request', {
+    method: 'GET',
+    url: API_URL,
+    query: {
+      date,
+      encoding: 'json'
+    },
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+
+  if (!response || response.success !== true) {
+    throw new Error((response && response.error) || 'Network request failed');
+  }
+
+  const data = response.data || {};
+  if (data.statusCode && (data.statusCode < 200 || data.statusCode >= 300)) {
+    throw new Error('AI news API returned ' + data.statusCode);
+  }
+
+  const payload = data.json || {};
+  if (payload.code && Number(payload.code) !== 200) {
+    throw new Error(payload.message || 'AI news API returned an error');
+  }
+
+  return payload.data || { date, news: [] };
+}
+
+function mapArticles(news, date) {
+  return news.map((item, index) => {
+    const title = String(item.title || 'AI 资讯');
+    const link = String(item.link || '');
+    const publishedDate = normalizeDate(item.date) || date;
+    return {
+      guid: `ai-news:${publishedDate}:${stableHash(title + link + index)}`,
+      title,
+      summary: String(item.detail || ''),
+      content: String(item.detail || ''),
+      author: String(item.source || 'AI 资讯快报'),
+      link,
+      publishedAt: `${publishedDate}T00:00:00.000Z`,
+      categories: ['AI资讯']
+    };
+  });
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function normalizeDate(value) {
+  if (!value) return '';
+  const text = String(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : '';
+}
+
+function addDays(dateText, days) {
+  const date = new Date(`${dateText}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function stableHash(input) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = ((hash << 5) - hash + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
+}

@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:core/core.dart';
 import 'capability_registry.dart';
@@ -179,6 +182,9 @@ class HostBridge {
     ));
     _registry.register(NotificationCapabilities.markAsRead(
       handler: _markNotificationAsRead,
+    ));
+    _registry.register(NetworkCapabilities.request(
+      handler: _networkRequest,
     ));
   }
 
@@ -608,6 +614,73 @@ class HostBridge {
     Map<String, dynamic> params,
   ) async {
     return {'marked': true, 'payload': params};
+  }
+
+  Future<Map<String, dynamic>> _networkRequest(
+    Map<String, dynamic> params,
+  ) async {
+    final method = (params['method'] as String? ?? 'GET').toUpperCase();
+    final url = params['url'] as String?;
+    if (url == null || url.isEmpty) {
+      throw ArgumentError('url is required');
+    }
+
+    final headers = _stringMap(params['headers']);
+    final query = _stringMap(params['query']);
+    final body = params['body'];
+    final uri = Uri.parse(url).replace(
+      queryParameters: query.isEmpty ? null : query,
+    );
+
+    final client = http.Client();
+    try {
+      late final http.Response response;
+      switch (method) {
+        case 'GET':
+          response = await client.get(uri, headers: headers);
+          break;
+        case 'POST':
+          response = await client.post(
+            uri,
+            headers: headers,
+            body: body == null
+                ? null
+                : body is String
+                    ? body
+                    : jsonEncode(body),
+          );
+          break;
+        default:
+          throw ArgumentError('Unsupported method: $method');
+      }
+
+      return {
+        'statusCode': response.statusCode,
+        'headers': response.headers,
+        'body': response.body,
+        'json': _tryDecodeJson(response.body),
+      };
+    } finally {
+      client.close();
+    }
+  }
+
+  Map<String, String> _stringMap(dynamic value) {
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(
+            key.toString(),
+            value?.toString() ?? '',
+          ));
+    }
+    return const {};
+  }
+
+  dynamic _tryDecodeJson(String body) {
+    try {
+      return jsonDecode(body);
+    } catch (_) {
+      return null;
+    }
   }
 
   List<Map<String, dynamic>> _mockContacts() {

@@ -1,7 +1,3 @@
-import com.android.build.gradle.LibraryExtension
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 allprojects {
     repositories {
         google()
@@ -21,26 +17,6 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
-}
-
-subprojects {
-    if (name == "quickjs_engine") {
-        plugins.withId("com.android.library") {
-            extensions.configure<LibraryExtension>("android") {
-                defaultConfig {
-                    externalNativeBuild {
-                        cmake {
-                            arguments += "-DCMAKE_SHARED_LINKER_FLAGS=-llog"
-                        }
-                    }
-                }
-            }
-        }
-
-        tasks.withType<KotlinCompile>().configureEach {
-            compilerOptions.jvmTarget.set(JvmTarget.JVM_1_8)
-        }
-    }
 }
 
 tasks.register<Delete>("clean") {

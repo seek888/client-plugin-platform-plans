@@ -3,7 +3,17 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  charset_converter
+  connectivity_plus
+  file_selector_windows
+  local_notifier
   quickjs_engine
+  screen_retriever_windows
+  share_plus
+  sqlite3_flutter_libs
+  tray_manager
+  url_launcher_windows
+  window_manager
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

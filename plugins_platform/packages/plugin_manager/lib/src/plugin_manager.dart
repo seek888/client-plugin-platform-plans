@@ -35,6 +35,9 @@ class PluginManager {
     _initialization = _initialize();
   }
 
+  /// 初始化完成后可等待的 Future
+  Future<void> get ready => _initialization;
+
   /// 初始化插件管理器
   Future<void> _initialize() async {
     _log('initialize: start');
@@ -335,6 +338,27 @@ class PluginManager {
 
   /// 获取 Runtime
   JSRuntime? getRuntime(String pluginId) => _runtimes[pluginId];
+
+  /// 调用插件导出函数
+  Future<dynamic> callPluginFunction(
+    String pluginId,
+    String functionName,
+    List<dynamic> args,
+  ) async {
+    final runtime = _runtimes[pluginId];
+    if (runtime == null) {
+      throw PluginError.notActivated(pluginId);
+    }
+    return runtime.callFunction(functionName, args);
+  }
+
+  /// 安装内置插件资产
+  Future<void> installFromAsset({
+    required PluginManifest manifest,
+    required String bundleSource,
+  }) async {
+    await install(manifest, bundleSource: bundleSource);
+  }
 
   /// 检查插件是否已安装
   bool isInstalled(String pluginId) => _manifests.containsKey(pluginId);

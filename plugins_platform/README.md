@@ -78,6 +78,12 @@ flutter run
 
 See [Plugin Development Guide](docs/plugin-development.md) for details on creating plugins.
 
+### Work Calendar Plugin
+
+- [接入说明](docs/work_calendar_plugin_integration.md)
+- [使用说明](docs/work_calendar_quick_start.md)
+- [AI Skill 草案](docs/skills/work-calendar-plugin-dev/SKILL.md)
+
 ## License
 
 MIT

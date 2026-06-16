@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(demo_app LANGUAGES CXX)
+project(rss_reader LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "demo_app")
+set(BINARY_NAME "rss_reader")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -106,3 +106,14 @@ install(DIRECTORY "${PROJECT_BUILD_DIR}/${FLUTTER_ASSET_DIR_NAME}"
 install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"
   CONFIGURATIONS Profile;Release
   COMPONENT Runtime)
+
+# === 本地 SQLite DLL 支持 ===
+# 将 sqlite3.dll 从项目根目录复制到构建输出目录
+set(SQLITE3_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../sqlite3.dll")
+if(EXISTS "${SQLITE3_DLL}")
+  install(FILES "${SQLITE3_DLL}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
+    COMPONENT Runtime)
+  message(STATUS "Found local sqlite3.dll, will be bundled with the application")
+else()
+  message(WARNING "sqlite3.dll not found at ${SQLITE3_DLL}. Please place sqlite3.dll in the project root directory for offline SQLite support.")
+endif()
