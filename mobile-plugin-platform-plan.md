@@ -435,6 +435,11 @@ abstract class JSRuntime {
 }
 ```
 
+> 设计备注：当前这套抽象只覆盖 JS / QuickJS / V8。
+> 如果后续要验证 Wasm，优先在这一层上方再加一层更宽的 `PluginRuntime` 设计边界，
+> 让 `PluginManager`、Host Bridge 和 STAC 协议保持稳定，不直接把 Wasm 变成当前主路径。
+> 本次 issue 的研究结论与后续取舍，见 [wasm-plugin-runtime-feasibility.md](wasm-plugin-runtime-feasibility.md)。
+
 ### 4.3 沙箱隔离
 
 每个 JS 插件运行在完全隔离的沙箱中：
