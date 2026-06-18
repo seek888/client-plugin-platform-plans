@@ -8,14 +8,11 @@ import 'package:uuid/uuid.dart';
 /// 插件订阅源发现服务
 class PluginFeedDiscoveryService {
   static const providerCapability = 'rss.feed.provider';
-  static const discoveryMarkerKey = 'plugin.discovery';
 
   final PluginManager _pluginManager;
   final FeedDao _feedDao;
   final BuiltinPluginBootstrap _bootstrap;
   final Uuid _uuid;
-
-  bool _synced = false;
 
   PluginFeedDiscoveryService({
     required PluginManager pluginManager,
@@ -28,56 +25,51 @@ class PluginFeedDiscoveryService {
         _uuid = uuid ?? const Uuid();
 
   Future<void> syncDiscoveredFeeds() async {
-    if (_synced) return;
-
-    await _bootstrap.ensureReady();
+    await _bootstrap.ensureInstalled();
     await _pluginManager.ready;
 
-    final plugins = _pluginManager
-        .getAllPlugins()
-        .where((plugin) => plugin.isActivated)
-        .where(
-          (plugin) => plugin.manifest.capabilities.any(
-            (capability) => capability.id == providerCapability,
-          ),
+    final plugins = _pluginManager.getAllPlugins().where(
+          (plugin) =>
+              plugin.isActivated &&
+              plugin.manifest.capabilities.any(
+                (capability) => capability.id == providerCapability,
+              ),
         );
 
     for (final plugin in plugins) {
-      if (!_pluginManager.isActivated(plugin.manifest.id)) {
-        await _pluginManager.activate(plugin.manifest.id);
-      }
       final discovered = await _pluginManager.callPluginFunction(
         plugin.manifest.id,
         'discoverFeeds',
         const [{}],
       );
-      await _upsertDiscoveredFeeds(plugin.manifest.id, discovered);
+      final feeds = _extractFeeds(discovered);
+      await _upsertDiscoveredFeeds(plugin.manifest.id, feeds);
       await _cleanupDuplicateFeeds(plugin.manifest.id);
     }
-
-    _synced = true;
   }
 
   Future<void> _upsertDiscoveredFeeds(
     String pluginId,
-    dynamic discovered,
+    List<Map<String, dynamic>> feeds,
   ) async {
-    final feeds = _normalizeFeeds(discovered);
-    if (feeds.isEmpty) return;
-
     for (final feed in feeds) {
       final feedKey = feed['feedKey']?.toString();
-      if (feedKey == null || feedKey.isEmpty) continue;
+      final title = feed['title']?.toString();
+      if (feedKey == null || feedKey.isEmpty || title == null || title.isEmpty) {
+        continue;
+      }
 
       final existing = await _feedDao.getPluginFeed(pluginId, feedKey);
-      if (existing != null) continue;
+      if (existing != null) {
+        continue;
+      }
 
       final now = DateTime.now();
       await _feedDao.insertFeed(
         FeedsTableCompanion(
           id: Value(_uuid.v4()),
           url: Value('plugin://$pluginId/$feedKey'),
-          title: Value(feed['title']?.toString() ?? pluginId),
+          title: Value(title),
           description: Value(feed['description']?.toString()),
           iconUrl: Value(feed['iconUrl']?.toString()),
           link: Value(feed['link']?.toString()),
@@ -95,55 +87,59 @@ class PluginFeedDiscoveryService {
   }
 
   Future<void> _cleanupDuplicateFeeds(String pluginId) async {
-    final feeds = await _feedDao.getAllFeeds();
-    final pluginFeeds = feeds.where(
-      (feed) =>
-          feed.sourceType == 'plugin' &&
-          feed.pluginId == pluginId &&
-          feed.pluginFeedKey == BuiltinPluginBootstrap.aiNewsDailyFeedKey,
-    ).toList(growable: false);
+    final pluginFeeds = await _feedDao.getPluginFeeds(pluginId);
+    final grouped = <String, List<FeedsTableData>>{};
 
-    if (pluginFeeds.length <= 1) return;
-
-    final keep = pluginFeeds.first;
-    for (final feed in pluginFeeds.skip(1)) {
-      await _feedDao.deleteFeed(feed.id);
+    for (final feed in pluginFeeds) {
+      final feedKey = feed.pluginFeedKey;
+      if (feedKey == null || feedKey.isEmpty) continue;
+      grouped.putIfAbsent(feedKey, () => []).add(feed);
     }
 
-    final companion = FeedsTableCompanion(
-      id: Value(keep.id),
-      url: Value(keep.url),
-      title: const Value(BuiltinPluginBootstrap.aiNewsDailyFeedTitle),
-      description: Value(keep.description),
-      iconUrl: Value(keep.iconUrl),
-      link: Value(keep.link),
-      categoryId: Value(keep.categoryId),
-      sortOrder: Value(keep.sortOrder),
-      unreadCount: Value(keep.unreadCount),
-      lastUpdated: Value(keep.lastUpdated),
-      lastFetched: Value(keep.lastFetched),
-      isEnabled: Value(keep.isEnabled),
-      isBlocked: Value(keep.isBlocked),
-      healthStatus: Value(keep.healthStatus),
-      failureCount: Value(keep.failureCount),
-      createdAt: Value(keep.createdAt),
-      updatedAt: Value(DateTime.now()),
-      sourceType: const Value('plugin'),
-      apiBaseUrl: const Value(null),
-      apiKey: const Value(null),
-      apiHeaders: const Value(null),
-      apiRemoteFeedId: const Value(null),
-      apiTimeout: const Value(30),
-      apiMaxRetries: const Value(3),
-      pluginId: Value(pluginId),
-      pluginFeedKey: const Value(BuiltinPluginBootstrap.aiNewsDailyFeedKey),
-      pluginProvider: const Value(providerCapability),
-    );
+    for (final entry in grouped.entries) {
+      final feeds = entry.value;
+      if (feeds.length <= 1) continue;
 
-    await _feedDao.updateFeed(companion);
+      final keep = feeds.first;
+      for (final feed in feeds.skip(1)) {
+        await _feedDao.deleteFeed(feed.id);
+      }
+
+      await _feedDao.updateFeed(
+        FeedsTableCompanion(
+          id: Value(keep.id),
+          url: Value(keep.url),
+          title: Value(keep.title),
+          description: Value(keep.description),
+          iconUrl: Value(keep.iconUrl),
+          link: Value(keep.link),
+          categoryId: Value(keep.categoryId),
+          sortOrder: Value(keep.sortOrder),
+          unreadCount: Value(keep.unreadCount),
+          lastUpdated: Value(keep.lastUpdated),
+          lastFetched: Value(keep.lastFetched),
+          isEnabled: Value(keep.isEnabled),
+          isBlocked: Value(keep.isBlocked),
+          healthStatus: Value(keep.healthStatus),
+          failureCount: Value(keep.failureCount),
+          createdAt: Value(keep.createdAt),
+          updatedAt: Value(DateTime.now()),
+          sourceType: const Value('plugin'),
+          apiBaseUrl: const Value(null),
+          apiKey: const Value(null),
+          apiHeaders: const Value(null),
+          apiRemoteFeedId: const Value(null),
+          apiTimeout: const Value(30),
+          apiMaxRetries: const Value(3),
+          pluginId: Value(pluginId),
+          pluginFeedKey: Value(entry.key),
+          pluginProvider: const Value(providerCapability),
+        ),
+      );
+    }
   }
 
-  List<Map<String, dynamic>> _normalizeFeeds(dynamic discovered) {
+  List<Map<String, dynamic>> _extractFeeds(dynamic discovered) {
     final rawFeeds = discovered is Map ? discovered['feeds'] : discovered;
     if (rawFeeds is! List) return const [];
     return rawFeeds

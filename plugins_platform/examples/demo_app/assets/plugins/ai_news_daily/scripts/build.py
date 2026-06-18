@@ -14,6 +14,7 @@ MANIFEST_FILE = ROOT / "manifest.json"
 RUNTIME_EXPORTS = [
     "onActivate",
     "onDeactivate",
+    "renderPage",
     "discoverFeeds",
     "getFeedInfo",
     "refresh",
@@ -54,7 +55,7 @@ def render_bundle(source: str) -> str:
         "(function(globalThis) {",
     ]
     for line in source.splitlines():
-        lines.append(f"  {line}")
+        lines.append(f"  {line}" if line else "")
     lines.append("")
     for name in RUNTIME_EXPORTS:
         lines.append(f"  globalThis.{name} = {name};")

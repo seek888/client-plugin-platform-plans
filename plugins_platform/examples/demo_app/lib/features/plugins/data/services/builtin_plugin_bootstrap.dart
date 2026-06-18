@@ -48,10 +48,6 @@ class BuiltinPluginBootstrap {
 
     _bootstrapped = true;
   }
-
-  Future<void> ensureReady() async {
-    await ensureInstalled();
-  }
 }
 
 class _BuiltinPluginAsset {

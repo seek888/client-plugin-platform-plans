@@ -5,16 +5,39 @@ import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:plugins_platform/plugins_platform.dart';
 
-class PluginExtensionsPage extends ConsumerWidget {
+class PluginExtensionsPage extends ConsumerStatefulWidget {
   const PluginExtensionsPage({super.key});
 
   static const _workCalendarPluginId = 'com.company.work_calendar';
   static const _workCalendarAssetPath = 'assets/plugins/work_calendar';
+  static const _aiNewsPluginId = 'com.rss.ai_news_daily';
+  static const _aiNewsAssetPath = 'assets/plugins/ai_news_daily';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PluginExtensionsPage> createState() =>
+      _PluginExtensionsPageState();
+}
+
+class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final manager = ref.read(pluginManagerProvider);
+      await manager.ready;
+      if (!mounted) return;
+      ref.read(pluginListProvider.notifier).state = manager.getAllPlugins();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final plugins = ref.watch(pluginListProvider);
-    final workCalendar = _findPlugin(plugins, _workCalendarPluginId);
+    final workCalendar = _findPlugin(
+      plugins,
+      PluginExtensionsPage._workCalendarPluginId,
+    );
+    final aiNews = _findPlugin(plugins, PluginExtensionsPage._aiNewsPluginId);
     final activatedCount = plugins.where((plugin) => plugin.isActivated).length;
 
     return Scaffold(
@@ -31,20 +54,49 @@ class PluginExtensionsPage extends ConsumerWidget {
             title: '工作日历',
             description: '在 RSS Reader 中集成日程、会议、审批和通知能力。',
             icon: Icons.calendar_month_outlined,
-            permissions: const [
-              '日程读取/写入',
-              '组织通讯录',
-              '审批读写',
-              '通知发送',
-            ],
+            permissions: const ['日程读取/写入', '组织通讯录', '审批读写', '通知发送'],
             plugin: workCalendar,
-            onInstall: () => _installWorkCalendarPlugin(context, ref),
-            onActivate: () => _activatePlugin(context, ref, _workCalendarPluginId),
+            onInstall: () => _installAssetPlugin(
+              context,
+              ref,
+              assetPath: PluginExtensionsPage._workCalendarAssetPath,
+              successMessage: '工作日历插件已安装',
+            ),
+            onActivate: () => _activatePlugin(
+              context,
+              ref,
+              PluginExtensionsPage._workCalendarPluginId,
+            ),
             onOpen: () => _openPluginPage(
               context,
               ref,
-              pluginId: _workCalendarPluginId,
+              pluginId: PluginExtensionsPage._workCalendarPluginId,
               title: '工作日历',
+            ),
+          ),
+          const SizedBox(height: 12),
+          _PluginCard(
+            title: 'AI 资讯快报',
+            description: '启用后自动注入订阅源，并拉取 AI、大模型领域的日更资讯。',
+            icon: Icons.auto_awesome_outlined,
+            permissions: const ['网络请求', '本地存储', '订阅源注入'],
+            plugin: aiNews,
+            onInstall: () => _installAssetPlugin(
+              context,
+              ref,
+              assetPath: PluginExtensionsPage._aiNewsAssetPath,
+              successMessage: 'AI 资讯快报插件已安装',
+            ),
+            onActivate: () => _activatePlugin(
+              context,
+              ref,
+              PluginExtensionsPage._aiNewsPluginId,
+            ),
+            onOpen: () => _openPluginPage(
+              context,
+              ref,
+              pluginId: PluginExtensionsPage._aiNewsPluginId,
+              title: 'AI 资讯快报',
             ),
           ),
           const SizedBox(height: 16),
@@ -63,31 +115,38 @@ class PluginExtensionsPage extends ConsumerWidget {
     return null;
   }
 
-  Future<void> _installWorkCalendarPlugin(
+  Future<void> _installAssetPlugin(
     BuildContext context,
-    WidgetRef ref,
-  ) async {
+    WidgetRef ref, {
+    required String assetPath,
+    required String successMessage,
+  }) async {
     try {
       final manifestJson = await rootBundle.loadString(
-        '$_workCalendarAssetPath/manifest.json',
+        '$assetPath/manifest.json',
       );
-      final jsBundle = await rootBundle.loadString(
-        '$_workCalendarAssetPath/dist/bundle.js',
-      );
+      final jsBundle = await rootBundle.loadString('$assetPath/dist/bundle.js');
       final manifest = PluginManifest.fromJson(
         jsonDecode(manifestJson) as Map<String, dynamic>,
       );
 
       final manager = ref.read(pluginManagerProvider);
+      await manager.ready;
       await manager.install(manifest, bundleSource: jsBundle);
       ref.read(pluginListProvider.notifier).state = manager.getAllPlugins();
 
       if (context.mounted) {
-        _showSnack(context, '工作日历插件已安装');
+        _showSnack(context, successMessage);
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (context.mounted) {
-        _showSnack(context, '安装失败：$error', isError: true);
+        _showPluginErrorLog(
+          context,
+          title: '安装失败',
+          pluginId: assetPath,
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
   }
@@ -99,15 +158,22 @@ class PluginExtensionsPage extends ConsumerWidget {
   ) async {
     try {
       final manager = ref.read(pluginManagerProvider);
+      await manager.ready;
       await manager.activate(pluginId);
       ref.read(pluginListProvider.notifier).state = manager.getAllPlugins();
 
       if (context.mounted) {
         _showSnack(context, '插件已激活');
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (context.mounted) {
-        _showSnack(context, '激活失败：$error', isError: true);
+        _showPluginErrorLog(
+          context,
+          title: '激活失败',
+          pluginId: pluginId,
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
   }
@@ -141,11 +207,83 @@ class PluginExtensionsPage extends ConsumerWidget {
           ),
         );
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (context.mounted) {
-        _showSnack(context, '打开失败：$error', isError: true);
+        _showPluginErrorLog(
+          context,
+          title: '打开失败',
+          pluginId: pluginId,
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
+  }
+
+  Future<void> _showPluginErrorLog(
+    BuildContext context, {
+    required String title,
+    required String pluginId,
+    required Object error,
+    required StackTrace stackTrace,
+  }) async {
+    final log = [
+      'Time: ${DateTime.now().toIso8601String()}',
+      'Plugin: $pluginId',
+      'Error: $error',
+      '',
+      'Stack trace:',
+      stackTrace.toString(),
+    ].join('\n');
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        final theme = Theme.of(dialogContext);
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 720,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 520),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(12),
+                  child: SelectableText(
+                    log,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: log));
+                if (dialogContext.mounted) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('错误日志已复制')));
+                }
+              },
+              icon: const Icon(Icons.copy),
+              label: const Text('复制日志'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('关闭'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showSnack(
@@ -208,11 +346,7 @@ class _SummaryPanel extends StatelessWidget {
 }
 
 class _Metric extends StatelessWidget {
-  const _Metric({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
+  const _Metric({required this.label, required this.value, required this.icon});
 
   final String label;
   final String value;
@@ -278,7 +412,10 @@ class _PluginCard extends StatelessWidget {
                     color: theme.colorScheme.primaryContainer,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: theme.colorScheme.onPrimaryContainer),
+                  child: Icon(
+                    icon,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -338,12 +475,13 @@ class _CapabilityPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final capabilities = plugins
-        .expand((plugin) => plugin.manifest.capabilities)
-        .map((capability) => capability.id)
-        .toSet()
-        .toList()
-      ..sort();
+    final capabilities =
+        plugins
+            .expand((plugin) => plugin.manifest.capabilities)
+            .map((capability) => capability.id)
+            .toSet()
+            .toList()
+          ..sort();
 
     return Card(
       margin: EdgeInsets.zero,

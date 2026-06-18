@@ -774,17 +774,48 @@ class FeedRepositoryImpl implements FeedRepository {
       final result = await adapter.fetchArticles();
 
       return result.fold(
-        (failure) => throw Exception(failure.userMessage),
-        (articleListResult) => _saveArticles(
-          feed.id,
-          articleListResult.articles,
-          feed.lastFetched,
-        ),
+        (failure) {
+          _log.error(
+            '订阅源适配器获取失败: ${feed.title}, message=${failureMessage(failure)}, userMessage=${failure.userMessage}',
+          );
+          throw Exception(failureMessage(failure));
+        },
+        (articleListResult) {
+          _log.info(
+            '订阅源适配器获取成功: ${feed.title}, articles=${articleListResult.articles.length}, totalCount=${articleListResult.totalCount}, hasMore=${articleListResult.hasMore}',
+          );
+          return _saveArticles(
+            feed.id,
+            articleListResult.articles,
+            feed.lastFetched,
+          );
+        },
       );
     }
 
     // 回退到原有的 RSS 解析方式
     return _fetchAndSaveArticles(feed.id, feed.url);
+  }
+
+  String failureMessage(Failure failure) {
+    return failure.when(
+      network: (message, statusCode, url) => message,
+      parse: (message, source, details) => message,
+      cache: (message, key) => message,
+      database: (message, table, operation) => message,
+      validation: (message, field, value) => message,
+      sync: (message, syncType, lastSyncTime) => message,
+      file: (message, path, operation) => message,
+      permission: (message, permissionType) => message,
+      authentication: (message, feedId) => message,
+      server: (message, statusCode, url) => message,
+      notFound: (message, resourceType, resourceId) => message,
+      unknown: (message, error, stackTrace) => message,
+      htmlParse: (message, htmlSnippet) => message,
+      deltaConversion: (message, details) => message,
+      editorSave: (message, articleId) => message,
+      editorLoad: (message, articleId) => message,
+    );
   }
 
   /// 保存文章列表

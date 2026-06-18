@@ -1,9 +1,12 @@
 import 'package:dartz/dartz.dart';
 import 'package:plugins_platform/plugins_platform.dart';
 import 'package:rss_reader/core/errors/failures.dart';
+import 'package:rss_reader/core/logging/logging.dart';
 import 'package:rss_reader/features/feed/domain/entities/data_source.dart';
 import 'package:rss_reader/features/feed/domain/entities/parsed_feed.dart';
 import 'package:rss_reader/features/feed/domain/services/data_source_adapter.dart';
+
+final _log = logger.tag(LogTags.feed);
 
 /// 插件数据源适配器
 class PluginSourceAdapter implements DataSourceAdapter {
@@ -44,21 +47,31 @@ class PluginSourceAdapter implements DataSourceAdapter {
     int page = 1,
     int pageSize = 20,
     DateTime? since,
-    }) async {
+  }) async {
     return _call(() async {
       final functionName = page <= 1 ? 'refresh' : 'loadMore';
-      final data = await _invokeData(functionName, {
+      final request = {
         'feedKey': config.feedKey,
         'provider': config.provider,
         'page': page,
         'pageSize': pageSize,
         if (since != null) 'since': since.toUtc().toIso8601String(),
-      });
+        if (since != null) 'date': _formatDate(since.toUtc()),
+      };
+      _log.info(
+        '插件订阅源请求: plugin=${config.pluginId}, feed=${config.feedKey}, function=$functionName, params=$request',
+      );
+
+      final data = await _invokeData(functionName, request);
       final articles = _parseArticles(data['articles']);
+      _log.info(
+        '插件订阅源返回: plugin=${config.pluginId}, feed=${config.feedKey}, function=$functionName, articles=${articles.length}, totalCount=${data['totalCount']}, hasMore=${data['hasMore']}, nextCursor=${data['nextCursor']}',
+      );
+
       return ArticleListResult(
         articles: articles,
         hasMore: data['hasMore'] == true,
-        totalCount: _parseInt(data['totalCount']),
+        totalCount: articles.length,
         nextCursor: data['nextCursor']?.toString(),
         currentPage: page,
         pageSize: pageSize,
@@ -82,7 +95,10 @@ class PluginSourceAdapter implements DataSourceAdapter {
   @override
   Future<Either<Failure, bool>> validateConnection() async {
     return _call(() async {
-      final data = await _invokeData('getFeedInfo', {'feedKey': config.feedKey});
+      final data = await _invokeData(
+        'getFeedInfo',
+        {'feedKey': config.feedKey},
+      );
       return data.isNotEmpty;
     }, operation: '验证插件数据源失败');
   }
@@ -102,7 +118,8 @@ class PluginSourceAdapter implements DataSourceAdapter {
     try {
       await _ensureActivated();
       return Right(await task());
-    } catch (e) {
+    } catch (e, stackTrace) {
+      _log.error(operation, error: e, stackTrace: stackTrace);
       return Left(Failure.unknown(message: '$operation: ${e.toString()}'));
     }
   }
@@ -117,6 +134,9 @@ class PluginSourceAdapter implements DataSourceAdapter {
     String functionName,
     Map<String, dynamic> params,
   ) async {
+    _log.debug(
+      '调用插件函数: plugin=${config.pluginId}, function=$functionName',
+    );
     final result = await _pluginManager.callPluginFunction(
       config.pluginId,
       functionName,
@@ -145,7 +165,9 @@ class PluginSourceAdapter implements DataSourceAdapter {
     if (value is! List) return const [];
     return value
         .whereType<Map>()
-        .map((item) => item.map((key, value) => MapEntry(key.toString(), value)))
+        .map(
+          (item) => item.map((key, value) => MapEntry(key.toString(), value)),
+        )
         .map(_parseArticle)
         .toList(growable: false);
   }
@@ -178,5 +200,12 @@ class PluginSourceAdapter implements DataSourceAdapter {
     if (value is int) return value;
     if (value == null) return null;
     return int.tryParse(value.toString());
+  }
+
+  String _formatDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
   }
 }

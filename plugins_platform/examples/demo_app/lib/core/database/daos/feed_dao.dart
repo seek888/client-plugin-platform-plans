@@ -66,6 +66,15 @@ class FeedDao extends DatabaseAccessor<AppDatabase> with _$FeedDaoMixin {
         .getSingleOrNull();
   }
 
+  /// 获取某个插件的所有订阅源
+  Future<List<FeedsTableData>> getPluginFeeds(String pluginId) {
+    return (select(feedsTable)
+          ..where(
+            (t) => t.sourceType.equals('plugin') & t.pluginId.equals(pluginId),
+          ))
+        .get();
+  }
+
   /// 插入订阅源
   Future<int> insertFeed(FeedsTableCompanion feed) {
     return into(feedsTable).insert(feed);
