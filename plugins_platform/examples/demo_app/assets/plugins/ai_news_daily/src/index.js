@@ -112,11 +112,12 @@ async function fetchDateWindow(startDate, pageSize) {
     attempts += 1;
   }
 
+  const pageArticles = articles.slice(0, pageSize);
   return {
-    articles: articles.slice(0, pageSize),
+    articles: pageArticles,
     hasMore: true,
     nextCursor: cursor,
-    totalCount: articles.length
+    totalCount: pageArticles.length
   };
 }
 
