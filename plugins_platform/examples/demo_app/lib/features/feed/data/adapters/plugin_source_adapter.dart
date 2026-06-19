@@ -196,12 +196,6 @@ class PluginSourceAdapter implements DataSourceAdapter {
     return DateTime.tryParse(value.toString());
   }
 
-  int? _parseInt(dynamic value) {
-    if (value is int) return value;
-    if (value == null) return null;
-    return int.tryParse(value.toString());
-  }
-
   String _formatDate(DateTime date) {
     final year = date.year.toString().padLeft(4, '0');
     final month = date.month.toString().padLeft(2, '0');

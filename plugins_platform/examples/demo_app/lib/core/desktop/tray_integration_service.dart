@@ -18,18 +18,11 @@ class TrayIntegrationService {
   TrayState _state = const TrayState();
   TraySettings _settings = const TraySettings();
 
-  // 同步回调
-  void Function()? _onSyncRequested;
-
-  // 设置页面回调
-  void Function()? _onSettingsRequested;
-
   /// 获取当前状态
   TrayState get state => _state;
 
   /// 设置同步回调
   set onSyncRequested(void Function()? callback) {
-    _onSyncRequested = callback;
     if (Platform.isWindows) {
       SystemTrayServiceImpl.instance.onSyncRequested = callback;
     }
@@ -37,7 +30,6 @@ class TrayIntegrationService {
 
   /// 设置设置页面回调
   set onSettingsRequested(void Function()? callback) {
-    _onSettingsRequested = callback;
     if (Platform.isWindows) {
       SystemTrayServiceImpl.instance.onSettingsRequested = callback;
     }
