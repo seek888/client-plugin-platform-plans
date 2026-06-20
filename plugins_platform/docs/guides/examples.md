@@ -105,7 +105,7 @@ let errors = {
 export function onActivate() {
   console.log('[feedback_form] Plugin activated');
   // 尝试恢复草稿
-  const draft = invokeHost('storage.local.get', { key: 'feedback_draft' });
+  const draft = invokeHost('storage.get', { key: 'feedback_draft' });
   if (draft && draft.value) {
     try {
       formData = JSON.parse(draft.value);
@@ -117,7 +117,7 @@ export function onActivate() {
 
 export function onDeactivate() {
   // 保存草稿
-  invokeHost('storage.local.set', {
+  invokeHost('storage.set', {
     key: 'feedback_draft',
     value: JSON.stringify(formData)
   });
@@ -242,7 +242,7 @@ export function renderPage() {
 export function handleNameChange(event) {
   formData.name = event.value || '';
   errors.name = '';
-  updateUI();
+  return renderPage();
 }
 
 /**
@@ -251,7 +251,7 @@ export function handleNameChange(event) {
 export function handleEmailChange(event) {
   formData.email = event.value || '';
   errors.email = '';
-  updateUI();
+  return renderPage();
 }
 
 /**
@@ -260,7 +260,7 @@ export function handleEmailChange(event) {
 export function handleFeedbackChange(event) {
   formData.feedback = event.value || '';
   errors.feedback = '';
-  updateUI();
+  return renderPage();
 }
 
 /**
@@ -309,12 +309,11 @@ export function handleSubmit() {
   // 验证表单
   if (!validateForm()) {
     console.log('[feedback_form] Validation failed');
-    updateUI();
     invokeHost('toast.show', {
       message: '请检查表单输入',
       duration: 2000
     });
-    return;
+    return renderPage();
   }
   
   // 提交数据（这里模拟提交到服务器）
@@ -345,15 +344,16 @@ export function handleSubmit() {
     errors = { name: '', email: '', feedback: '' };
     
     // 删除草稿
-    invokeHost('storage.local.remove', { key: 'feedback_draft' });
+    invokeHost('storage.remove', { key: 'feedback_draft' });
     
-    updateUI();
+    return renderPage();
   } catch (error) {
     console.error('[feedback_form] Submit failed:', error);
     invokeHost('toast.show', {
       message: '提交失败，请稍后重试',
       duration: 2000
     });
+    return null;
   }
 }
 
@@ -515,7 +515,6 @@ async function loadArticles() {
   
   isLoading = true;
   hasError = false;
-  updateUI();
   
   try {
     console.log('[news_list] Fetching articles...');
@@ -537,7 +536,7 @@ async function loadArticles() {
     console.log('[news_list] Loaded', articles.length, 'articles');
     
     // 缓存到本地
-    invokeHost('storage.local.set', {
+    invokeHost('storage.set', {
       key: 'news_cache',
       value: JSON.stringify({ articles, timestamp: Date.now() })
     });
@@ -548,7 +547,7 @@ async function loadArticles() {
     errorMessage = '加载失败，请稍后重试';
     
     // 尝试从缓存加载
-    const cached = invokeHost('storage.local.get', { key: 'news_cache' });
+    const cached = invokeHost('storage.get', { key: 'news_cache' });
     if (cached && cached.value) {
       try {
         const data = JSON.parse(cached.value);
@@ -561,7 +560,7 @@ async function loadArticles() {
     }
   } finally {
     isLoading = false;
-    updateUI();
+    return renderPage();
   }
 }
 
@@ -904,7 +903,7 @@ export function createEvent(eventData) {
 
 | 能力 | 权限 | 用途 |
 |------|------|------|
-| `storage.local.get/set` | `storage.local` | 本地数据存储 |
+| `storage.get/set/remove/clear` | `storage.local` | 本地数据存储 |
 | `network.request` | `network.request` | HTTP 请求 |
 | `toast.show` | `toast.show` | 轻提示 |
 | `dialog.alert` | `dialog.alert` | 弹窗提示 |
@@ -935,7 +934,7 @@ export function createEvent(eventData) {
      console.log('[plugin_name] Before:', state);
      // ... 修改状态
      console.log('[plugin_name] After:', state);
-     updateUI();
+     return renderPage();
    }
    ```
 

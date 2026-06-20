@@ -1366,7 +1366,7 @@ async function loadContacts() {
 // 搜索按钮点击
 function handleSearch() {
   // 打开搜索页面或显示搜索框
-  host.invoke('navigation.open', {
+  invokeHost('navigation.open', {
     route: '/contacts/search'
   });
 }
@@ -1374,7 +1374,7 @@ function handleSearch() {
 // 联系人项点击
 function handleContactTap(event) {
   const contact = event.item;
-  host.invoke('navigation.open', {
+  invokeHost('navigation.open', {
     route: '/contacts/detail',
     arguments: {
       contactId: contact.id

@@ -21,7 +21,7 @@
 ### 调用流程
 
 ```
-JS 插件 → JSRuntime.callHostBridge(method, params)
+JS 插件 → invokeHost(method, params)
        ↓
 HostBridge.handleInvoke(pluginId, method, params)
        ↓
@@ -71,7 +71,7 @@ HostBridge.handleInvoke(pluginId, method, params)
 
 ```javascript
 // JS 插件代码
-await host.invoke('toast.show', {
+await invokeHost('toast.show', {
   message: '操作成功',
   duration: 'short'
 });
@@ -105,7 +105,7 @@ await host.invoke('toast.show', {
 **代码示例**:
 
 ```javascript
-await host.invoke('dialog.alert', {
+await invokeHost('dialog.alert', {
   title: '提示',
   message: '这是一条重要信息'
 });
@@ -139,7 +139,7 @@ await host.invoke('dialog.alert', {
 **代码示例**:
 
 ```javascript
-const result = await host.invoke('dialog.confirm', {
+const result = await invokeHost('dialog.confirm', {
   title: '删除确认',
   message: '确定要删除这条记录吗？'
 });
@@ -178,7 +178,7 @@ if (result.confirmed) {
 
 ```javascript
 // 显示加载
-await host.invoke('loading.show', {
+await invokeHost('loading.show', {
   message: '正在处理...'
 });
 
@@ -186,7 +186,7 @@ await host.invoke('loading.show', {
 await performHeavyTask();
 
 // 隐藏加载
-await host.invoke('loading.hide');
+await invokeHost('loading.hide');
 ```
 
 ---
@@ -237,7 +237,7 @@ await host.invoke('loading.hide');
 **代码示例**:
 
 ```javascript
-await host.invoke('navigation.open', {
+await invokeHost('navigation.open', {
   route: '/article/detail',
   arguments: {
     articleId: '12345',
@@ -267,7 +267,7 @@ await host.invoke('navigation.open', {
 **代码示例**:
 
 ```javascript
-await host.invoke('navigation.back');
+await invokeHost('navigation.back');
 ```
 
 ---
@@ -299,7 +299,7 @@ await host.invoke('navigation.back');
 
 ```javascript
 // 登录成功后替换到主页
-await host.invoke('navigation.replace', {
+await invokeHost('navigation.replace', {
   route: '/home'
 });
 ```
@@ -333,7 +333,7 @@ await host.invoke('navigation.replace', {
 **代码示例**:
 
 ```javascript
-const result = await host.invoke('storage.get', {
+const result = await invokeHost('storage.get', {
   key: 'user_preferences'
 });
 
@@ -368,7 +368,7 @@ const preferences = result.value ? JSON.parse(result.value) : {};
 **代码示例**:
 
 ```javascript
-await host.invoke('storage.set', {
+await invokeHost('storage.set', {
   key: 'user_preferences',
   value: JSON.stringify({ theme: 'dark', fontSize: 16 })
 });
@@ -401,7 +401,7 @@ await host.invoke('storage.set', {
 **代码示例**:
 
 ```javascript
-await host.invoke('storage.remove', {
+await invokeHost('storage.remove', {
   key: 'user_preferences'
 });
 ```
@@ -429,7 +429,7 @@ await host.invoke('storage.remove', {
 **代码示例**:
 
 ```javascript
-await host.invoke('storage.clear');
+await invokeHost('storage.clear');
 ```
 
 ---
@@ -462,11 +462,11 @@ await host.invoke('storage.clear');
 **代码示例**:
 
 ```javascript
-await host.invoke('clipboard.write', {
+await invokeHost('clipboard.write', {
   text: 'https://example.com/share/12345'
 });
 
-await host.invoke('toast.show', {
+await invokeHost('toast.show', {
   message: '已复制到剪贴板'
 });
 ```
@@ -492,7 +492,7 @@ await host.invoke('toast.show', {
 **代码示例**:
 
 ```javascript
-const result = await host.invoke('clipboard.read');
+const result = await invokeHost('clipboard.read');
 console.log('剪贴板内容:', result.text);
 ```
 
@@ -528,7 +528,7 @@ console.log('剪贴板内容:', result.text);
 **代码示例**:
 
 ```javascript
-await host.invoke('notification.send', {
+await invokeHost('notification.send', {
   title: '新消息',
   body: '您有一条待办事项即将到期'
 });
@@ -586,10 +586,10 @@ await host.invoke('notification.send', {
 
 ```javascript
 // 设置角标
-await host.invoke('notification.badge.set', { count: 5 });
+await invokeHost('notification.badge.set', { count: 5 });
 
 // 清除角标
-await host.invoke('notification.badge.set', { count: 0 });
+await invokeHost('notification.badge.set', { count: 0 });
 ```
 
 ---
@@ -678,7 +678,7 @@ await host.invoke('notification.badge.set', { count: 0 });
 **代码示例**:
 
 ```javascript
-const result = await host.invoke('org.contacts.search', {
+const result = await invokeHost('org.contacts.search', {
   keyword: '张三'
 });
 
@@ -754,7 +754,7 @@ result.items.forEach(contact => {
 **代码示例**:
 
 ```javascript
-const result = await host.invoke('org.contacts.pick', {
+const result = await invokeHost('org.contacts.pick', {
   multiple: true
 });
 
@@ -1008,7 +1008,7 @@ console.log('选中的联系人:', result.items);
 **代码示例**:
 
 ```javascript
-const result = await host.invoke('device.camera.scan');
+const result = await invokeHost('device.camera.scan');
 
 if (result.type === 'qr') {
   console.log('二维码内容:', result.content);
@@ -1164,7 +1164,7 @@ if (result.type === 'qr') {
 
 ```javascript
 // GET 请求
-const result = await host.invoke('network.request', {
+const result = await invokeHost('network.request', {
   method: 'GET',
   url: 'https://api.example.com/articles',
   query: {
@@ -1182,7 +1182,7 @@ if (result.statusCode === 200) {
 }
 
 // POST 请求
-const postResult = await host.invoke('network.request', {
+const postResult = await invokeHost('network.request', {
   method: 'POST',
   url: 'https://api.example.com/comments',
   headers: {
@@ -1311,7 +1311,7 @@ const postResult = await host.invoke('network.request', {
 
 ```javascript
 // 日期选择器
-const result = await host.invoke('picker.show', {
+const result = await invokeHost('picker.show', {
   type: 'date',
   initialValue: '2024-01-01'
 });
@@ -1329,7 +1329,7 @@ if (result.value) {
 
 ```javascript
 try {
-  const result = await host.invoke('storage.get', { key: 'config' });
+  const result = await invokeHost('storage.get', { key: 'config' });
   // 处理结果
 } catch (error) {
   if (error.message.includes('Permission denied')) {
@@ -1360,7 +1360,7 @@ try {
 某些能力可能仅在特定平台可用，建议先检查设备信息：
 
 ```javascript
-const deviceInfo = await host.invoke('device.info.get');
+const deviceInfo = await invokeHost('device.info.get');
 
 if (deviceInfo.platform === 'android') {
   // Android 特有逻辑
@@ -1375,8 +1375,8 @@ if (deviceInfo.platform === 'android') {
 
 ```javascript
 const [contacts, departments] = await Promise.all([
-  host.invoke('org.contacts.search', { keyword: '' }),
-  host.invoke('org.department.list')
+  invokeHost('org.contacts.search', { keyword: '' }),
+  invokeHost('org.department.list')
 ]);
 ```
 

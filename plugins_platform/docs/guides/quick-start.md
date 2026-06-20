@@ -134,7 +134,7 @@ export function onActivate() {
   console.log('[hello_plugin] Plugin activated!');
   
   // 从本地存储读取点击次数
-  const stored = invokeHost('storage.local.get', { key: 'click_count' });
+  const stored = invokeHost('storage.get', { key: 'click_count' });
   if (stored && stored.value) {
     clickCount = Number(stored.value) || 0;
   }
@@ -231,7 +231,7 @@ export function renderPage() {
           createSizedBox(4),
           createText('3. 使用 invokeHost() 调用宿主能力', 14, '#4B5563', '400'),
           createSizedBox(4),
-          createText('4. 状态变化后调用 updateUI() 刷新界面', 14, '#4B5563', '400')
+          createText('4. 事件处理函数返回新的 Schema 刷新界面', 14, '#4B5563', '400')
         ]
       }
     ]
@@ -246,7 +246,7 @@ export function handleButtonClick() {
   console.log('[hello_plugin] Button clicked! Count:', clickCount);
   
   // 保存到本地存储
-  invokeHost('storage.local.set', {
+  invokeHost('storage.set', {
     key: 'click_count',
     value: String(clickCount)
   });
@@ -257,8 +257,8 @@ export function handleButtonClick() {
     duration: 2000
   });
   
-  // 刷新 UI
-  updateUI();
+  // 返回新的 Schema，宿主会按 STACUpdate 规则刷新 UI
+  return renderPage();
 }
 
 // ============ 辅助函数 ============
@@ -309,7 +309,7 @@ function createSizedBox(height) {
 
 4. **宿主能力调用**
    - `invokeHost()`: 调用宿主提供的能力
-   - `updateUI()`: 触发 UI 更新（全局函数）
+   - 事件处理函数可以返回新的 Schema 或 STACUpdate 刷新 UI
 
 ## Step 4: 创建构建脚本
 
@@ -469,7 +469,7 @@ flutter run
 - 查看控制台是否有错误
 
 **问题：UI 没有更新**
-- 确认调用了 `updateUI()`
+- 确认事件处理函数返回了新的 Schema 或 STACUpdate
 - 检查 `renderPage()` 是否返回正确的 Schema
 
 ## 下一步
