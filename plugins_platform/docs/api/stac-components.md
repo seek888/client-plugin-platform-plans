@@ -646,7 +646,7 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 
 #### checkbox
 
-复选框。
+复选框（单个）。
 
 **Props**:
 
@@ -663,9 +663,55 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 
 ---
 
+#### checkboxGroup
+
+复选框组（多选）。
+
+**Props**:
+
+```json
+{
+  "label": "选择兴趣爱好",
+  "value": ["reading", "music"],
+  "options": [
+    { "value": "reading", "label": "阅读" },
+    { "value": "music", "label": "音乐" },
+    { "value": "sports", "label": "运动" }
+  ]
+}
+```
+
+**事件**:
+
+- `onChanged`: 选中状态改变时触发
+
+**示例**:
+
+```json
+{
+  "type": "checkboxGroup",
+  "id": "hobbies",
+  "props": {
+    "label": "选择兴趣爱好",
+    "options": [
+      { "value": "reading", "label": "阅读" },
+      { "value": "music", "label": "音乐" },
+      { "value": "sports", "label": "运动" },
+      { "value": "travel", "label": "旅行" }
+    ],
+    "initialValue": ["reading", "music"]
+  },
+  "events": {
+    "onChanged": "handleHobbiesChange"
+  }
+}
+```
+
+---
+
 #### radio
 
-单选按钮。
+单选按钮（单个）。
 
 **Props**:
 
@@ -674,6 +720,50 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
   "groupValue": "option1",
   "value": "option1",
   "label": "选项 1"
+}
+```
+
+---
+
+#### radioGroup
+
+单选按钮组。
+
+**Props**:
+
+```json
+{
+  "label": "选择性别",
+  "value": "male",
+  "options": [
+    { "value": "male", "label": "男" },
+    { "value": "female", "label": "女" }
+  ]
+}
+```
+
+**事件**:
+
+- `onChanged`: 选中状态改变时触发
+
+**示例**:
+
+```json
+{
+  "type": "radioGroup",
+  "id": "gender",
+  "props": {
+    "label": "选择性别",
+    "options": [
+      { "value": "male", "label": "男" },
+      { "value": "female", "label": "女" },
+      { "value": "other", "label": "其他" }
+    ],
+    "initialValue": "male"
+  },
+  "events": {
+    "onChanged": "handleGenderChange"
+  }
 }
 ```
 
@@ -691,6 +781,10 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
   "label": "启用通知"
 }
 ```
+
+**事件**:
+
+- `onChanged`: 选中状态改变时触发
 
 ---
 

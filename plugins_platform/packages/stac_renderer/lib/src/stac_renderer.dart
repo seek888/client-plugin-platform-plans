@@ -314,8 +314,12 @@ Widget _buildNodeCore(
       return _FormDropdownField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.checkbox:
       return _FormCheckboxField(node: node, props: props, formKey: formKey);
+    case STACComponentTypes.checkboxGroup:
+      return _FormCheckboxGroupField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.radio:
       return _FormRadioField(node: node, props: props, formKey: formKey);
+    case STACComponentTypes.radioGroup:
+      return _FormRadioGroupField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.switch_:
       return _FormSwitchField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.slider:
@@ -663,6 +667,83 @@ class _FormCheckboxFieldState extends State<_FormCheckboxField> {
   }
 }
 
+class _FormCheckboxGroupField extends StatefulWidget {
+  const _FormCheckboxGroupField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormCheckboxGroupField> createState() =>
+      _FormCheckboxGroupFieldState();
+}
+
+class _FormCheckboxGroupFieldState extends State<_FormCheckboxGroupField> {
+  late List<String> _selectedValues;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    final initial =
+        _initialFormValue(widget.node, widget.props, widget.formKey);
+    if (initial is List) {
+      _selectedValues = initial.map((e) => e.toString()).toList();
+    } else if (initial is String && initial.isNotEmpty) {
+      _selectedValues = [initial];
+    } else {
+      _selectedValues = [];
+    }
+    if (id != null) {
+      widget.formKey?.setValue(id, _selectedValues);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    final options = _formOptions(widget.props['options']);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.props['label'] != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(widget.props['label'].toString()),
+          ),
+        ...options.map(
+          (option) => CheckboxListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(option.label),
+            value: _selectedValues.contains(option.value),
+            onChanged: widget.props['enabled'] == false
+                ? null
+                : (checked) {
+                    setState(() {
+                      if (checked == true) {
+                        if (!_selectedValues.contains(option.value)) {
+                          _selectedValues.add(option.value);
+                        }
+                      } else {
+                        _selectedValues.remove(option.value);
+                      }
+                    });
+                    if (id != null) {
+                      widget.formKey?.setValue(id, _selectedValues);
+                    }
+                  },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _FormSwitchField extends StatefulWidget {
   const _FormSwitchField({
     required this.node,
@@ -730,6 +811,57 @@ class _FormRadioField extends StatefulWidget {
 }
 
 class _FormRadioFieldState extends State<_FormRadioField> {
+  late bool _value;
+
+  @override
+  void initState() {
+    super.initState();
+    final id = widget.node['id']?.toString();
+    final groupValue = widget.props['groupValue']?.toString();
+    final thisValue = widget.props['value']?.toString();
+    _value = groupValue == thisValue;
+    if (id != null) {
+      widget.formKey?.setValue(id, _value);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final id = widget.node['id']?.toString();
+    final thisValue = widget.props['value']?.toString();
+    return RadioListTile<String>(
+      contentPadding: EdgeInsets.zero,
+      title: Text(widget.props['label']?.toString() ?? ''),
+      value: thisValue ?? '',
+      groupValue: _value ? thisValue : null,
+      onChanged: widget.props['enabled'] == false
+          ? null
+          : (value) {
+              setState(() => _value = value == thisValue);
+              if (id != null) {
+                widget.formKey?.setValue(id, value);
+              }
+            },
+    );
+  }
+}
+
+class _FormRadioGroupField extends StatefulWidget {
+  const _FormRadioGroupField({
+    required this.node,
+    required this.props,
+    required this.formKey,
+  });
+
+  final Map<String, dynamic> node;
+  final Map<String, dynamic> props;
+  final STACFormKey? formKey;
+
+  @override
+  State<_FormRadioGroupField> createState() => _FormRadioGroupFieldState();
+}
+
+class _FormRadioGroupFieldState extends State<_FormRadioGroupField> {
   String? _value;
 
   @override

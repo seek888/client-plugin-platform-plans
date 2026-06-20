@@ -4,6 +4,14 @@
 
 能力桥接（Capability Bridge）是插件平台的核心机制，允许 JS 插件安全地调用宿主应用提供的原生能力。所有能力调用都经过权限校验和平台兼容性检查。
 
+> **📊 实现状态**: 本文档定义了 40 个能力，其中 **27 个已完整实现**，**3 个部分实现**，**10 个规划中**。查看详细实现状态请参阅 [能力实现清单](./CAPABILITY_IMPLEMENTATION_STATUS.md)。
+
+## 图例说明
+
+- ✅ **已实现** - 可以直接使用
+- ⚠️ **部分实现** - 基本功能可用，但存在已知限制（查看能力说明了解详情）
+- 📋 **计划中** - 已规划但未实现，调用会返回错误
+
 ## 架构原理
 
 ### 能力定义
@@ -44,11 +52,12 @@ HostBridge.handleInvoke(pluginId, method, params)
 
 ## UI 交互能力
 
-### toast.show
+### ✅ toast.show
 
 显示轻量级提示信息。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Flutter SnackBar
 
 **输入参数**:
 
@@ -79,11 +88,12 @@ await invokeHost('toast.show', {
 
 ---
 
-### dialog.alert
+### ✅ dialog.alert
 
 显示警告对话框（仅确认按钮）。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Flutter AlertDialog
 
 **输入参数**:
 
@@ -113,11 +123,12 @@ await invokeHost('dialog.alert', {
 
 ---
 
-### dialog.confirm
+### ✅ dialog.confirm
 
 显示确认对话框（确认 + 取消按钮）。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Flutter AlertDialog
 
 **输入参数**:
 
@@ -152,11 +163,12 @@ if (result.confirmed) {
 
 ---
 
-### loading.show
+### ✅ loading.show
 
 显示加载中对话框。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Flutter AlertDialog + CircularProgressIndicator
 
 **输入参数**:
 
@@ -191,11 +203,12 @@ await invokeHost('loading.hide');
 
 ---
 
-### loading.hide
+### ✅ loading.hide
 
 隐藏加载中对话框。
 
 **权限**: 无需权限
+**实现状态**: 已实现
 
 **输入参数**: 无
 
@@ -211,11 +224,12 @@ await invokeHost('loading.hide');
 
 ## 导航能力
 
-### navigation.open
+### ✅ navigation.open
 
 打开新页面（push 导航）。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Navigator.pushNamed
 
 **输入参数**:
 
@@ -248,11 +262,12 @@ await invokeHost('navigation.open', {
 
 ---
 
-### navigation.back
+### ✅ navigation.back
 
 返回上一页。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Navigator.pop
 
 **输入参数**: 无
 
@@ -272,11 +287,12 @@ await invokeHost('navigation.back');
 
 ---
 
-### navigation.replace
+### ✅ navigation.replace
 
 替换当前页面（replace 导航）。
 
 **权限**: 无需权限
+**实现状态**: 已实现，使用 Navigator.pushReplacementNamed
 
 **输入参数**:
 
@@ -308,11 +324,12 @@ await invokeHost('navigation.replace', {
 
 ## 存储能力
 
-### storage.get
+### ✅ storage.get
 
 获取本地存储值。
 
 **权限**: `storage.local`
+**实现状态**: 已实现，使用 shared_preferences
 
 **输入参数**:
 
@@ -342,11 +359,12 @@ const preferences = result.value ? JSON.parse(result.value) : {};
 
 ---
 
-### storage.set
+### ✅ storage.set
 
 设置本地存储值。
 
 **权限**: `storage.local`
+**实现状态**: 已实现，使用 shared_preferences
 
 **输入参数**:
 
@@ -376,11 +394,12 @@ await invokeHost('storage.set', {
 
 ---
 
-### storage.remove
+### ✅ storage.remove
 
 删除本地存储值。
 
 **权限**: `storage.local`
+**实现状态**: 已实现，使用 shared_preferences
 
 **输入参数**:
 
@@ -408,11 +427,12 @@ await invokeHost('storage.remove', {
 
 ---
 
-### storage.clear
+### ✅ storage.clear
 
 清空所有本地存储。
 
 **权限**: `storage.local`
+**实现状态**: 已实现，使用 shared_preferences
 
 **输入参数**: 无
 
@@ -436,11 +456,12 @@ await invokeHost('storage.clear');
 
 ## 剪贴板能力
 
-### clipboard.write
+### ⚠️ clipboard.write
 
 写入剪贴板。
 
 **权限**: `clipboard.write`
+**实现状态**: 部分实现，需要集成 flutter/services ClipboardData（预计 2026-07-01 完成）
 
 **输入参数**:
 
@@ -473,11 +494,12 @@ await invokeHost('toast.show', {
 
 ---
 
-### clipboard.read
+### ⚠️ clipboard.read
 
 读取剪贴板内容。
 
 **权限**: `clipboard.read`
+**实现状态**: 部分实现，需要集成 flutter/services ClipboardData（预计 2026-07-01 完成）
 
 **输入参数**: 无
 
@@ -500,11 +522,12 @@ console.log('剪贴板内容:', result.text);
 
 ## 通知能力
 
-### notification.send
+### ⚠️ notification.send
 
 发送系统通知。
 
 **权限**: `notification.send`
+**实现状态**: 部分实现，需要集成 flutter_local_notifications（预计 2026-07-15 完成）
 
 **输入参数**:
 
@@ -536,11 +559,12 @@ await invokeHost('notification.send', {
 
 ---
 
-### notification.cancel
+### ✅ notification.cancel
 
 取消指定通知。
 
 **权限**: `notification.send`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -560,11 +584,12 @@ await invokeHost('notification.send', {
 
 ---
 
-### notification.badge.set
+### ✅ notification.badge.set
 
 设置应用角标数字。
 
 **权限**: `notification.send`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -594,11 +619,12 @@ await invokeHost('notification.badge.set', { count: 0 });
 
 ---
 
-### notification.list
+### ✅ notification.list
 
 获取通知列表。
 
 **权限**: `notification.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**: 无
 
@@ -618,11 +644,12 @@ await invokeHost('notification.badge.set', { count: 0 });
 
 ---
 
-### notification.markRead
+### ✅ notification.markRead
 
 标记通知为已读。
 
 **权限**: `notification.write`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -644,11 +671,12 @@ await invokeHost('notification.badge.set', { count: 0 });
 
 ## 组织与联系人能力
 
-### org.contacts.search
+### ✅ org.contacts.search
 
 搜索联系人。
 
 **权限**: `org.contacts.read`
+**实现状态**: 已实现（Mock，返回模拟数据）
 
 **输入参数**:
 
@@ -689,11 +717,12 @@ result.items.forEach(contact => {
 
 ---
 
-### org.contacts.getById
+### ✅ org.contacts.getById
 
 根据 ID 获取联系人详情。
 
 **权限**: `org.contacts.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -719,11 +748,12 @@ result.items.forEach(contact => {
 
 ---
 
-### org.contacts.pick
+### ✅ org.contacts.pick
 
 打开联系人选择器（由宿主提供 UI）。
 
 **权限**: `org.contacts.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -763,11 +793,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### org.department.list
+### ✅ org.department.list
 
 获取部门列表。
 
 **权限**: `org.department.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**: 无
 
@@ -788,11 +819,12 @@ console.log('选中的联系人:', result.items);
 
 ## 审批能力
 
-### approval.list
+### ✅ approval.list
 
 获取审批列表。
 
 **权限**: `approval.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -821,11 +853,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### approval.detail.get
+### ✅ approval.detail.get
 
 获取审批详情。
 
 **权限**: `approval.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -855,11 +888,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### approval.submit
+### ✅ approval.submit
 
 提交审批。
 
 **权限**: `approval.write`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -882,11 +916,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### approval.history
+### ✅ approval.history
 
 获取审批历史记录。
 
 **权限**: `approval.read`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -911,11 +946,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### approval.cancel
+### ✅ approval.cancel
 
 撤销审批。
 
 **权限**: `approval.write`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -935,11 +971,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### approval.forward
+### ✅ approval.forward
 
 转发审批。
 
 **权限**: `approval.write`
+**实现状态**: 已实现（Mock）
 
 **输入参数**:
 
@@ -962,11 +999,12 @@ console.log('选中的联系人:', result.items);
 
 ## 设备能力
 
-### device.location.get
+### 📋 device.location.get
 
 获取设备位置（需要用户授权）。
 
 **权限**: `device.location.read`
+**实现状态**: 计划中，需要集成 geolocator 包（预计 Q3 2026）
 
 **输入参数**:
 
@@ -988,11 +1026,12 @@ console.log('选中的联系人:', result.items);
 
 ---
 
-### device.camera.scan
+### 📋 device.camera.scan
 
 扫码（二维码 / 条形码）。
 
 **权限**: `device.camera.use`
+**实现状态**: 计划中，需要集成 mobile_scanner 包（预计 Q3 2026）
 
 **输入参数**: 无
 
@@ -1017,11 +1056,12 @@ if (result.type === 'qr') {
 
 ---
 
-### device.bluetooth.scan
+### 📋 device.bluetooth.scan
 
 扫描蓝牙设备。
 
 **权限**: `device.bluetooth.use`
+**实现状态**: 计划中，需要集成 flutter_blue_plus 包（预计 Q4 2026）
 
 **输入参数**:
 
@@ -1047,11 +1087,12 @@ if (result.type === 'qr') {
 
 ---
 
-### device.info.get
+### 📋 device.info.get
 
 获取设备信息。
 
 **权限**: `device.info.read`
+**实现状态**: 计划中，需要集成 device_info_plus 包（预计 Q3 2026）
 
 **输入参数**: 无
 
@@ -1068,11 +1109,12 @@ if (result.type === 'qr') {
 
 ---
 
-### file.pick
+### 📋 file.pick
 
 选择文件。
 
 **权限**: `file.pick`
+**实现状态**: 计划中，需要集成 file_picker 包（预计 Q3 2026）
 
 **输入参数**:
 
@@ -1100,11 +1142,12 @@ if (result.type === 'qr') {
 
 ---
 
-### file.upload
+### 📋 file.upload
 
 上传文件。
 
 **权限**: `file.upload`
+**实现状态**: 计划中（预计 Q4 2026）
 
 **输入参数**:
 
@@ -1131,11 +1174,14 @@ if (result.type === 'qr') {
 
 ## 网络能力
 
-### network.request
+### ✅ network.request
 
 发起 HTTP 请求（代理请求，解决跨域问题）。
 
 **权限**: `network.request`
+**实现状态**: 已实现，当前支持 GET/POST 方法，使用 http 包
+
+> **已知限制**: 当前仅支持 GET 和 POST 方法。PUT、DELETE、PATCH 支持计划在 Q4 2026 添加。
 
 **输入参数**:
 
@@ -1197,11 +1243,12 @@ const postResult = await invokeHost('network.request', {
 
 ---
 
-### network.upload
+### 📋 network.upload
 
 上传文件到指定 URL。
 
 **权限**: `network.request`
+**实现状态**: 计划中（预计 Q4 2026）
 
 **输入参数**:
 
@@ -1225,11 +1272,12 @@ const postResult = await invokeHost('network.request', {
 
 ---
 
-### network.download
+### 📋 network.download
 
 下载文件。
 
 **权限**: `network.request`
+**实现状态**: 计划中（预计 Q4 2026）
 
 **输入参数**:
 
@@ -1253,11 +1301,12 @@ const postResult = await invokeHost('network.request', {
 
 ## UI 辅助能力
 
-### bottomSheet.show
+### 📋 bottomSheet.show
 
 显示底部表单。
 
 **权限**: 无需权限
+**实现状态**: 计划中，使用 showModalBottomSheet（预计 2026-08-01）
 
 **输入参数**:
 
@@ -1284,11 +1333,12 @@ const postResult = await invokeHost('network.request', {
 
 ---
 
-### picker.show
+### 📋 picker.show
 
 显示选择器（通用选择器）。
 
 **权限**: 无需权限
+**实现状态**: 计划中，支持日期/时间选择器（预计 2026-08-01）
 
 **输入参数**:
 
@@ -1406,6 +1456,13 @@ const [contacts, departments] = await Promise.all([
 | `file.upload`          | 上传文件                 |
 | `network.request`       | 发起网络请求              |
 
+### 相关文档
+
+- [能力实现清单](./CAPABILITY_IMPLEMENTATION_STATUS.md) - 查看所有能力的详细实现状态和开发路线图
+- [插件开发指南](../guide/plugin-development.md) - 了解如何开发插件
+- [权限系统](../guide/permissions.md) - 了解权限申请和管理
+
 ### 版本历史
 
-- **1.0.0** (当前版本) - 初始版本，包含所有核心能力
+- **1.1.0** (2026-06-20) - 添加能力实现状态标注，新增实现清单文档
+- **1.0.0** - 初始版本，包含所有核心能力
