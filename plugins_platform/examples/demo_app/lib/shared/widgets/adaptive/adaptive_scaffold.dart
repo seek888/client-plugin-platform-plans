@@ -84,26 +84,36 @@ class AdaptiveScaffold extends HookConsumerWidget {
                 children: [
                   // 左侧导航栏
                   if (navigationRail != null)
-                    SizedBox(
-                      width: navigationRailWidth,
-                      child: navigationRail,
-                    ),
+                    SizedBox(width: navigationRailWidth, child: navigationRail),
                   // 全屏覆盖层或正常布局
                   Expanded(
-                    child: fullScreenOverlay ??
-                        Row(
-                          children: [
-                            // 中间面板
-                            SizedBox(width: middlePanelWidth, child: middlePanel),
-                            // 分隔线
-                            const VerticalDivider(width: 1),
-                            // 右侧内容区
-                            Expanded(
-                              child: detailPanel ??
-                                  emptyDetailPlaceholder ??
-                                  const Center(child: Text('选择一篇文章开始阅读')),
-                            ),
-                          ],
+                    child:
+                        fullScreenOverlay ??
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final adaptiveMiddleWidth = constraints.maxWidth
+                                .clamp(296.0, 380.0)
+                                .toDouble();
+                            final panelWidth = middlePanelWidth
+                                .clamp(280.0, adaptiveMiddleWidth)
+                                .toDouble();
+
+                            return Row(
+                              children: [
+                                // 中间面板
+                                SizedBox(width: panelWidth, child: middlePanel),
+                                // 分隔线
+                                const VerticalDivider(width: 1),
+                                // 右侧内容区
+                                Expanded(
+                                  child:
+                                      detailPanel ??
+                                      emptyDetailPlaceholder ??
+                                      const Center(child: Text('选择一篇文章开始阅读')),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                   ),
                 ],
@@ -149,16 +159,13 @@ class _DesktopTitleBar extends StatelessWidget {
             // 应用标题
             Text(
               'RSS Reader',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w500),
             ),
             const Spacer(),
             // 窗口控制按钮
-            const WindowControls(
-              buttonSize: 32,
-              iconSize: 14,
-            ),
+            const WindowControls(buttonSize: 32, iconSize: 14),
           ],
         ),
       ),

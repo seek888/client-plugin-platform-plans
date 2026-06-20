@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:rss_reader/core/utils/platform_utils.dart';
 import 'package:rss_reader/features/article/domain/entities/article.dart';
@@ -90,6 +91,10 @@ class ArticleList extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final fallbackScrollController = useScrollController();
+    final effectiveScrollController =
+        scrollController ?? fallbackScrollController;
+
     // 加载中状态显示骨架屏
     if (isLoading) {
       return const ArticleListSkeleton(count: 8);
@@ -99,6 +104,31 @@ class ArticleList extends HookConsumerWidget {
     if (articles.isEmpty) {
       return _buildEmptyState(context);
     }
+
+    final listView = ListView.builder(
+      controller: effectiveScrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 12),
+      itemCount: articles.length + 1, // +1 for load more indicator
+      itemBuilder: (context, index) {
+        if (index == articles.length) {
+          return LoadMoreIndicator(isLoading: isLoadingMore, hasMore: hasMore);
+        }
+
+        final article = articles[index];
+        final feed = feedMap?[article.feedId];
+
+        return _buildArticleItem(context, article, feed);
+      },
+    );
+
+    final scrollableList = PlatformUtils.supportsHover
+        ? Scrollbar(
+            controller: effectiveScrollController,
+            thumbVisibility: true,
+            child: listView,
+          )
+        : listView;
 
     // 文章列表
     return NotificationListener<ScrollNotification>(
@@ -115,24 +145,7 @@ class ArticleList extends HookConsumerWidget {
       },
       child: RefreshIndicator(
         onRefresh: onRefresh ?? () async {},
-        child: ListView.builder(
-          controller: scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: articles.length + 1, // +1 for load more indicator
-          itemBuilder: (context, index) {
-            if (index == articles.length) {
-              return LoadMoreIndicator(
-                isLoading: isLoadingMore,
-                hasMore: hasMore,
-              );
-            }
-
-            final article = articles[index];
-            final feed = feedMap?[article.feedId];
-
-            return _buildArticleItem(context, article, feed);
-          },
-        ),
+        child: scrollableList,
       ),
     );
   }
@@ -268,24 +281,71 @@ class ArticleList extends HookConsumerWidget {
 
   /// 构建空状态
   Widget _buildEmptyState(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.article_outlined, size: 64, color: colorScheme.outline),
-          const SizedBox(height: 16),
-          Text(
-            '暂无文章',
-            style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '下拉刷新获取最新内容',
-            style: TextStyle(fontSize: 14, color: colorScheme.outline),
-          ),
-        ],
+    return RefreshIndicator(
+      onRefresh: onRefresh ?? () async {},
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: constraints.maxWidth < 360 ? 24 : 40,
+              vertical: 24,
+            ),
+            children: [
+              SizedBox(height: constraints.maxHeight * 0.16),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer.withValues(
+                            alpha: 0.75,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Icon(
+                          Icons.article_outlined,
+                          size: 36,
+                          color: colorScheme.onSecondaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        '暂无文章',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '当前订阅源还没有可读内容。刷新后，新文章会显示在这里。',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      OutlinedButton.icon(
+                        onPressed: () => onRefresh?.call(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('刷新文章'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

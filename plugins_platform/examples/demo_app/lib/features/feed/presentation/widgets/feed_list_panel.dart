@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:rss_reader/features/feed/domain/entities/feed.dart';
 import 'package:rss_reader/features/feed/presentation/widgets/feed_item.dart';
@@ -60,17 +61,26 @@ class FeedListPanel extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final activeFeedCount = feeds.where((feed) => feed.isEnabled).length;
+    final scrollController = useScrollController();
 
     return Column(
       children: [
+        _FeedPanelHeader(
+          feedCount: activeFeedCount,
+          unreadCount: totalUnreadCount,
+          isRefreshing: isRefreshing,
+          onRefresh: onRefresh,
+          onAddFeed: onAddFeed,
+        ),
         // 搜索栏和添加按钮
-        _buildSearchBar(context, colorScheme, ref),
+        _buildSearchBar(context, colorScheme),
         const Divider(height: 1),
         // 订阅源列表
         Expanded(
           child: RefreshIndicator(
             onRefresh: () async => onRefresh(),
-            child: _buildFeedList(context, colorScheme),
+            child: _buildFeedList(context, colorScheme, scrollController),
           ),
         ),
       ],
@@ -78,62 +88,45 @@ class FeedListPanel extends HookConsumerWidget {
   }
 
   /// 构建搜索栏
-  Widget _buildSearchBar(
-    BuildContext context,
-    ColorScheme colorScheme,
-    WidgetRef ref,
-  ) {
+  Widget _buildSearchBar(BuildContext context, ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: onSearchPressed,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.search,
-                      size: 20,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '搜索订阅源和文章',
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
+      child: GestureDetector(
+        onTap: onSearchPressed,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 20, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '搜索订阅源和文章',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
-          // 添加订阅源按钮 - 离线时禁用
-          OfflineAwareIconButton(
-            onPressed: onAddFeed,
-            icon: const Icon(Icons.add),
-            tooltip: '添加订阅源',
-            offlineTooltip: '离线模式下无法添加订阅源',
-          ),
-        ],
+        ),
       ),
     );
   }
 
   /// 构建订阅源列表
-  Widget _buildFeedList(BuildContext context, ColorScheme colorScheme) {
+  Widget _buildFeedList(
+    BuildContext context,
+    ColorScheme colorScheme,
+    ScrollController scrollController,
+  ) {
     if (feeds.isEmpty) {
       return _buildEmptyState(context, colorScheme);
     }
@@ -150,7 +143,9 @@ class FeedListPanel extends HookConsumerWidget {
           .toList();
     }
 
-    return ListView(
+    final listView = ListView(
+      controller: scrollController,
+      padding: const EdgeInsets.only(bottom: 12),
       children: [
         // "全部" 选项 - Requirements 22.1: 首项固定显示"全部"选项
         _AllFeedsItem(
@@ -188,33 +183,199 @@ class FeedListPanel extends HookConsumerWidget {
         }),
       ],
     );
+
+    return Scrollbar(
+      controller: scrollController,
+      thumbVisibility: true,
+      child: listView,
+    );
   }
 
   /// 构建空状态
   Widget _buildEmptyState(BuildContext context, ColorScheme colorScheme) {
-    return Center(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontalPadding = constraints.maxWidth < 320 ? 20.0 : 32.0;
+
+        return Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: 24,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.rss_feed,
+                    size: 36,
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  '还没有订阅源',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '添加常看的站点后，文章会按未读状态和更新时间汇总到这里。',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // 添加订阅源按钮 - 离线时禁用
+                OfflineAwareButton(
+                  onPressed: onAddFeed,
+                  offlineTooltip: '离线模式下无法添加订阅源',
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add),
+                      SizedBox(width: 8),
+                      Text('添加订阅源'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _FeedPanelHeader extends StatelessWidget {
+  final int feedCount;
+  final int unreadCount;
+  final bool isRefreshing;
+  final VoidCallback onRefresh;
+  final VoidCallback onAddFeed;
+
+  const _FeedPanelHeader({
+    required this.feedCount,
+    required this.unreadCount,
+    required this.isRefreshing,
+    required this.onRefresh,
+    required this.onAddFeed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 12, 8),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.rss_feed, size: 64, color: colorScheme.outline),
-          const SizedBox(height: 16),
-          Text(
-            '还没有订阅源',
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
+                  '订阅源',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: isRefreshing ? '正在刷新' : '刷新订阅源',
+                child: IconButton(
+                  visualDensity: VisualDensity.compact,
+                  onPressed: isRefreshing ? null : onRefresh,
+                  icon: isRefreshing
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                ),
+              ),
+              OfflineAwareIconButton(
+                onPressed: onAddFeed,
+                icon: const Icon(Icons.add),
+                tooltip: '添加订阅源',
+                offlineTooltip: '离线模式下无法添加订阅源',
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '点击右上角添加你的第一个订阅源',
-            style: TextStyle(color: colorScheme.outline, fontSize: 14),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusChip(icon: Icons.rss_feed, label: '$feedCount 个订阅'),
+              _StatusChip(
+                icon: Icons.mark_email_unread_outlined,
+                label: unreadCount > 99 ? '99+ 未读' : '$unreadCount 未读',
+                emphasize: unreadCount > 0,
+              ),
+            ],
           ),
-          const SizedBox(height: 24),
-          // 添加订阅源按钮 - 离线时禁用
-          OfflineAwareButton(
-            onPressed: onAddFeed,
-            offlineTooltip: '离线模式下无法添加订阅源',
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [Icon(Icons.add), SizedBox(width: 8), Text('添加订阅源')],
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool emphasize;
+
+  const _StatusChip({
+    required this.icon,
+    required this.label,
+    this.emphasize = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundColor = emphasize
+        ? colorScheme.primaryContainer
+        : colorScheme.surfaceContainerHighest;
+    final foregroundColor = emphasize
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: foregroundColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: foregroundColor,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
