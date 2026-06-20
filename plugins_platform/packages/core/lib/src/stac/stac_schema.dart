@@ -280,7 +280,9 @@ class STACComponentTypes {
   static const String textarea = 'textarea';
   static const String dropdown = 'dropdown';
   static const String checkbox = 'checkbox';
+  static const String checkboxGroup = 'checkboxGroup';
   static const String radio = 'radio';
+  static const String radioGroup = 'radioGroup';
   static const String switch_ = 'switch';
   static const String slider = 'slider';
 
