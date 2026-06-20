@@ -22,11 +22,11 @@ JS 运行时（JS Runtime）是插件的执行环境，基于 QuickJS 引擎实�
 
 ## 全局对象
 
-### host
+### invokeHost
 
-宿主能力桥接对象，用于调用宿主提供的原生能力。
+宿主能力桥接函数，用于调用宿主提供的原生能力。当前 QuickJS 适配层注入的是全局 `invokeHost(method, params)`，不是浏览器或 Node.js 风格的全局 `host` 对象。
 
-#### host.invoke(method, params)
+#### invokeHost(method, params)
 
 调用宿主能力。
 
@@ -40,18 +40,18 @@ JS 运行时（JS Runtime）是插件的执行环境，基于 QuickJS 引擎实�
 
 ```javascript
 // 显示 Toast
-await host.invoke('toast.show', {
+await invokeHost('toast.show', {
   message: '操作成功'
 });
 
 // 获取存储值
-const result = await host.invoke('storage.get', {
+const result = await invokeHost('storage.get', {
   key: 'user_token'
 });
 console.log('Token:', result.value);
 
 // 发起网络请求
-const response = await host.invoke('network.request', {
+const response = await invokeHost('network.request', {
   method: 'GET',
   url: 'https://api.example.com/articles'
 });
@@ -62,7 +62,7 @@ console.log('文章列表:', response.json);
 
 ```javascript
 try {
-  await host.invoke('storage.set', {
+  await invokeHost('storage.set', {
     key: 'config',
     value: JSON.stringify({ theme: 'dark' })
   });
@@ -158,7 +158,7 @@ promise.then(result => {
 
 ```javascript
 async function fetchData() {
-  const response = await host.invoke('network.request', {
+  const response = await invokeHost('network.request', {
     method: 'GET',
     url: 'https://api.example.com/data'
   });
@@ -384,7 +384,7 @@ console.log(user);
 ```javascript
 // 保存状态
 async function saveState(key, value) {
-  await host.invoke('storage.set', {
+  await invokeHost('storage.set', {
     key: key,
     value: JSON.stringify(value)
   });
@@ -392,7 +392,7 @@ async function saveState(key, value) {
 
 // 加载状态
 async function loadState(key) {
-  const result = await host.invoke('storage.get', { key });
+  const result = await invokeHost('storage.get', { key });
   return result.value ? JSON.parse(result.value) : null;
 }
 
@@ -468,7 +468,7 @@ function renderMainPage() {
 function handleStart() {
   console.log('开始使用');
   // 导航到下一页
-  host.invoke('navigation.open', {
+  invokeHost('navigation.open', {
     route: '/plugin/features'
   });
 }
@@ -484,7 +484,7 @@ function handleStart() {
 let articles = [];
 
 async function loadArticles() {
-  const response = await host.invoke('network.request', {
+  const response = await invokeHost('network.request', {
     method: 'GET',
     url: 'https://api.example.com/articles'
   });
@@ -539,7 +539,7 @@ function renderArticleList() {
 ```javascript
 async function fetchArticles(page = 1, limit = 20) {
   try {
-    const response = await host.invoke('network.request', {
+    const response = await invokeHost('network.request', {
       method: 'GET',
       url: 'https://api.example.com/articles',
       query: {
@@ -573,7 +573,7 @@ console.log('获取到', articles.length, '篇文章');
 
 ```javascript
 async function createComment(articleId, content) {
-  const response = await host.invoke('network.request', {
+  const response = await invokeHost('network.request', {
     method: 'POST',
     url: 'https://api.example.com/comments',
     headers: {
@@ -601,7 +601,7 @@ console.log('评论已创建:', comment);
 ```javascript
 async function safeApiCall(url, options) {
   try {
-    const response = await host.invoke('network.request', {
+    const response = await invokeHost('network.request', {
       url: url,
       ...options
     });
@@ -757,7 +757,7 @@ async function getCategories() {
     return cachedCategories;
   }
   
-  const response = await host.invoke('network.request', {
+  const response = await invokeHost('network.request', {
     method: 'GET',
     url: 'https://api.example.com/categories'
   });
@@ -779,7 +779,7 @@ const API = {
   baseUrl: 'https://api.example.com',
   
   async get(endpoint, params) {
-    return await host.invoke('network.request', {
+    return await invokeHost('network.request', {
       method: 'GET',
       url: this.baseUrl + endpoint,
       query: params
@@ -787,7 +787,7 @@ const API = {
   },
   
   async post(endpoint, data) {
-    return await host.invoke('network.request', {
+    return await invokeHost('network.request', {
       method: 'POST',
       url: this.baseUrl + endpoint,
       body: data
@@ -798,15 +798,15 @@ const API = {
 // ui.js 模块
 const UI = {
   showLoading(message) {
-    return host.invoke('loading.show', { message });
+    return invokeHost('loading.show', { message });
   },
   
   hideLoading() {
-    return host.invoke('loading.hide');
+    return invokeHost('loading.hide');
   },
   
   showToast(message) {
-    return host.invoke('toast.show', { message });
+    return invokeHost('toast.show', { message });
   }
 };
 
@@ -889,7 +889,7 @@ async function onActivate() {
 
 // ========== 数据加载 ==========
 async function loadFeeds() {
-  const result = await host.invoke('storage.get', {
+  const result = await invokeHost('storage.get', {
     key: 'rss_feeds'
   });
   
@@ -906,7 +906,7 @@ async function loadFeeds() {
 }
 
 async function saveFeeds() {
-  await host.invoke('storage.set', {
+  await invokeHost('storage.set', {
     key: 'rss_feeds',
     value: JSON.stringify(State.feeds)
   });
@@ -917,9 +917,9 @@ async function loadArticles() {
   if (!feed) return;
   
   try {
-    await host.invoke('loading.show', { message: '加载文章...' });
+    await invokeHost('loading.show', { message: '加载文章...' });
     
-    const response = await host.invoke('network.request', {
+    const response = await invokeHost('network.request', {
       method: 'GET',
       url: feed.url
     });
@@ -927,14 +927,14 @@ async function loadArticles() {
     // 解析 RSS（简化示例）
     State.articles = parseRSS(response.body);
     
-    await host.invoke('loading.hide');
-    await host.invoke('toast.show', {
+    await invokeHost('loading.hide');
+    await invokeHost('toast.show', {
       message: `已加载 ${State.articles.length} 篇文章`
     });
   } catch (error) {
-    await host.invoke('loading.hide');
+    await invokeHost('loading.hide');
     console.error('加载文章失败:', error);
-    await host.invoke('dialog.alert', {
+    await invokeHost('dialog.alert', {
       title: '加载失败',
       message: error.toString()
     });
@@ -1015,7 +1015,7 @@ function openArticle_2() {
 }
 
 async function openArticleDetail(article) {
-  await host.invoke('navigation.open', {
+  await invokeHost('navigation.open', {
     route: '/article/detail',
     arguments: {
       url: article.link,
@@ -1090,7 +1090,7 @@ A: 使用宿主提供的事件总线或共享存储。
 
 ```javascript
 // 发送事件
-await host.invoke('eventBus.emit', {
+await invokeHost('eventBus.emit', {
   event: 'article.updated',
   data: { articleId: '123' }
 });
@@ -1118,7 +1118,7 @@ const Cache = {
     }
     
     // 从持久化存储读取
-    const result = await host.invoke('storage.get', { key });
+    const result = await invokeHost('storage.get', { key });
     if (result.value) {
       const data = JSON.parse(result.value);
       this.memory[key] = data;
@@ -1132,7 +1132,7 @@ const Cache = {
     this.memory[key] = value;
     
     if (persist) {
-      await host.invoke('storage.set', {
+      await invokeHost('storage.set', {
         key: key,
         value: JSON.stringify(value)
       });
@@ -1152,7 +1152,7 @@ let currentPage = 1;
 const pageSize = 20;
 
 async function loadMoreArticles() {
-  const response = await host.invoke('network.request', {
+  const response = await invokeHost('network.request', {
     method: 'GET',
     url: 'https://api.example.com/articles',
     query: {
@@ -1191,7 +1191,7 @@ function handleScrollEnd() {
 
 - DOM API（document, window 等）
 - Node.js 内置模块（fs, http 等）
-- XMLHttpRequest / fetch（使用 `host.invoke('network.request')` 替代）
+- XMLHttpRequest / fetch（使用 `invokeHost('network.request')` 替代）
 - WebSocket（规划中）
 - Web Workers
 
