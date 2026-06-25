@@ -1,5 +1,5 @@
 import { calendarState, cloneEvent, createDraft } from '../state/calendar_state.js';
-import { pickContacts, sendNotification, showToast, submitApproval } from '../services/host_api.js';
+import { pickContacts, sendNotification, showPicker, showToast, submitApproval } from '../services/host_api.js';
 import { parseDate } from '../utils/date.js';
 import { renderCalendarPage } from '../ui/pages/calendar_page.js';
 import { t, toggleLocale } from '../i18n.js';
@@ -117,6 +117,37 @@ export function handlePickContacts() {
       attendees: items.map(item => item.name),
       attendeeIds: items.map(item => item.id)
     };
+    return fullUpdate();
+  });
+}
+
+export function handlePickDateTime(state) {
+  const field = state && state.props ? state.props.field : null;
+  if (!field || (field !== 'startTime' && field !== 'endTime')) {
+    return fullUpdate();
+  }
+
+  const currentValue = calendarState.draft[field];
+  const initialValue = currentValue ? new Date(currentValue).toISOString() : new Date().toISOString();
+
+  const result = showPicker('datetime', { initialValue });
+
+  if (!result) {
+    showToast(t('calendar.pickerNotAvailable'));
+    return fullUpdate();
+  }
+
+  return Promise.resolve(result).then(data => {
+    if (data && data.data && !data.data.cancelled && data.data.value) {
+      calendarState.draft = {
+        ...calendarState.draft,
+        [field]: data.data.value
+      };
+      showToast(t('calendar.timeUpdated'));
+    }
+    return fullUpdate();
+  }).catch(err => {
+    console.error('Picker error:', err);
     return fullUpdate();
   });
 }

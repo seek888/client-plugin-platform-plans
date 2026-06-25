@@ -5,6 +5,16 @@ export function showToast(message) {
   return invokeHost('toast.show', { message });
 }
 
+export function showPicker(type, options = {}) {
+  if (typeof invokeHost !== 'function') {
+    return null;
+  }
+  return invokeHost('picker.show', {
+    type,
+    ...options
+  });
+}
+
 export function pickContacts(selectedIds) {
   if (typeof invokeHost !== 'function') {
     return null;

@@ -30,7 +30,7 @@
     function sameDay(left, right) {
       return formatDate(left) === formatDate(right);
     }
-    
+
     exports["parseDate"] = parseDate;
     exports["formatDate"] = formatDate;
     exports["formatTime"] = formatTime;
@@ -70,7 +70,7 @@
           return sum + (new Date(evt.endTime) - new Date(evt.startTime)) / 3600000;
         }, 0);
     }
-    
+
     exports["createEvent"] = createEvent;
     exports["getEventsForDate"] = getEventsForDate;
     exports["countWeekTasks"] = countWeekTasks;
@@ -120,12 +120,12 @@
       if (calendarState.events.length > 0) {
         return;
       }
-    
+
       const today = new Date();
       const y = today.getFullYear();
       const m = today.getMonth();
       const d = today.getDate();
-    
+
       calendarState.events = [
         withI18n(
           createEvent('evt_1', '周例会', 'meeting', y, m, d, 9, 0, 10, 0, '会议室A', ['张三', '李四', '王五']),
@@ -164,7 +164,7 @@
           ['event.businessTrip.attendee1']
         )
       ];
-    
+
       calendarState.approvals = [
         {
           id: 'apr_1',
@@ -181,7 +181,7 @@
           createdAt: new Date(y, m, d - 2, 15, 0, 0).toISOString()
         }
       ];
-    
+
       calendarState.tasks = [
         {
           id: 'task_1',
@@ -196,7 +196,7 @@
           dueAt: new Date(y, m, d + 2, 12, 0, 0).toISOString()
         }
       ];
-    
+
       calendarState.notifications = [
         {
           id: 'ntf_1',
@@ -204,7 +204,7 @@
           read: false
         }
       ];
-    
+
       if (calendarState.events.length > 0) {
         calendarState.selectedEventId = calendarState.events[0].id;
         calendarState.draft = cloneEvent(calendarState.events[0]);
@@ -212,7 +212,7 @@
         calendarState.editorMode = 'edit';
       }
     }
-    
+
     function withI18n(event, titleKey, locationKey, attendeeKeys) {
       return {
         ...event,
@@ -266,7 +266,7 @@
         taskStatus: 'open'
       };
     }
-    
+
     exports["calendarState"] = calendarState;
     exports["ensureCalendarData"] = ensureCalendarData;
     exports["cloneEvent"] = cloneEvent;
@@ -276,7 +276,7 @@
   define("src/i18n.js", function(module, exports, require) {
     const { calendarState } = require("src/state/calendar_state.js");
     const LOCALES = ['zh-CN', 'en-US'];
-    
+
     const messages = {
       'zh-CN': {
         'plugin.name': '工作日历',
@@ -312,6 +312,8 @@
         'calendar.pickContacts': '选择联系人',
         'calendar.repeat': '重复规则',
         'calendar.reminder': '提醒',
+        'calendar.pickerNotAvailable': '日期选择器不可用',
+        'calendar.timeUpdated': '时间已更新',
         'calendar.recurrence.none': '不重复',
         'calendar.recurrence.daily': '每天',
         'calendar.recurrence.weekly': '每周',
@@ -419,6 +421,8 @@
         'calendar.pickContacts': 'Pick Contacts',
         'calendar.repeat': 'Repeat',
         'calendar.reminder': 'Reminder',
+        'calendar.pickerNotAvailable': 'Picker not available',
+        'calendar.timeUpdated': 'Time updated',
         'calendar.recurrence.none': 'None',
         'calendar.recurrence.daily': 'Daily',
         'calendar.recurrence.weekly': 'Weekly',
@@ -493,12 +497,12 @@
         'event.newTask.notes': 'Temporary event created from the plugin'
       }
     };
-    
+
     const monthNames = {
       'zh-CN': ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
       'en-US': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     };
-    
+
     const weekdayNames = {
       'zh-CN': ['日', '一', '二', '三', '四', '五', '六'],
       'en-US': ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -544,7 +548,7 @@
     function listSeparator() {
       return (calendarState.locale || 'zh-CN') === 'zh-CN' ? '、' : ', ';
     }
-    
+
     exports["LOCALES"] = LOCALES;
     exports["t"] = t;
     exports["toggleLocale"] = toggleLocale;
@@ -583,7 +587,7 @@
         props: { width: width, height: height }
       };
     }
-    
+
     exports["colors"] = colors;
     exports["text"] = text;
     exports["sizedBox"] = sizedBox;
@@ -646,7 +650,7 @@
         ]
       };
     }
-    
+
     exports["header"] = header;
   });
 
@@ -668,7 +672,7 @@
         ]
       };
     }
-    
+
     function statCard(label, value, color) {
       return {
         type: 'expanded',
@@ -689,7 +693,7 @@
         ]
       };
     }
-    
+
     exports["statsPanel"] = statsPanel;
   });
 
@@ -715,36 +719,36 @@
       const firstDay = new Date(year, month, 1);
       const totalDays = new Date(year, month + 1, 0).getDate();
       const grid = [];
-    
+
       for (let i = 0; i < firstDay.getDay(); i++) {
         grid.push(emptyCell());
       }
-    
+
       for (let day = 1; day <= totalDays; day++) {
         const date = new Date(year, month, day);
         grid.push(dayCell(date));
       }
-    
+
       while (grid.length % 7 !== 0) {
         grid.push(emptyCell());
       }
-    
+
       return grid;
     }
-    
+
     function emptyCell() {
       return {
         type: 'container',
         style: { backgroundColor: '#F9FAFB', borderRadius: 8 }
       };
     }
-    
+
     function dayCell(date) {
       const events = getEventsForDate(calendarState.events, date);
       const isToday = sameDay(date, new Date());
       const selected = sameDay(date, calendarState.selectedDate);
       const color = selected ? '#DBEAFE' : (isToday ? '#EFF6FF' : '#FFFFFF');
-    
+
       return {
         type: 'container',
         props: { date: formatDate(date) },
@@ -761,7 +765,7 @@
         ]
       };
     }
-    
+
     function eventDot(evt) {
       const category = calendarState.categories[evt.type] || calendarState.categories.task;
       return {
@@ -777,7 +781,7 @@
         ]
       };
     }
-    
+
     exports["weekdayHeader"] = weekdayHeader;
     exports["generateCalendarGrid"] = generateCalendarGrid;
   });
@@ -815,7 +819,7 @@
       const attendees = getEventAttendees(evt);
       const start = new Date(evt.startTime);
       const end = new Date(evt.endTime);
-    
+
       return {
         type: 'container',
         props: { eventId: evt.id },
@@ -854,7 +858,7 @@
         ]
       };
     }
-    
+
     exports["selectedDayPanel"] = selectedDayPanel;
     exports["eventRow"] = eventRow;
   });
@@ -873,7 +877,7 @@
       const year = calendarState.currentDate.getFullYear();
       const month = calendarState.currentDate.getMonth() + 1;
       const selectedEvents = getEventsForDate(calendarState.events, calendarState.selectedDate);
-    
+
       return {
         schemaVersion: '1.0',
         type: 'page',
@@ -905,11 +909,11 @@
         ]
       };
     }
-    
+
     function editorPanel() {
       const draft = calendarState.draft;
       const attendees = draft.attendees || [];
-    
+
       return {
         type: 'card',
         style: { margin: '2,0,10,0' },
@@ -918,8 +922,8 @@
           text(t('calendar.editorSubtitle'), 12, '#6B7280', '400'),
           formField('title', t('calendar.fieldTitle'), draft.title),
           formField('location', t('calendar.fieldLocation'), draft.location),
-          formField('startTime', t('calendar.fieldStartTime'), formatTime(new Date(draft.startTime))),
-          formField('endTime', t('calendar.fieldEndTime'), formatTime(new Date(draft.endTime))),
+          timePickerField('startTime', t('calendar.fieldStartTime'), formatTime(new Date(draft.startTime))),
+          timePickerField('endTime', t('calendar.fieldEndTime'), formatTime(new Date(draft.endTime))),
           formField('notes', t('calendar.fieldNotes'), draft.notes, true),
           optionRow([
             eventTypeButton('meeting'),
@@ -945,7 +949,31 @@
         ]
       };
     }
-    
+
+    function timePickerField(field, label, value) {
+      return {
+        type: 'container',
+        style: {
+          backgroundColor: '#F9FAFB',
+          borderRadius: 8,
+          padding: '12,12,12,12',
+          margin: '8,0,8,0'
+        },
+        events: { onTap: 'handlePickDateTime' },
+        props: { field },
+        children: [
+          {
+            type: 'column',
+            props: { crossAxisAlignment: 'start', spacing: 4 },
+            children: [
+              text(label, 12, '#6B7280', '500'),
+              text(value || '--:--', 14, '#111827', '400')
+            ]
+          }
+        ]
+      };
+    }
+
     function formField(field, label, value, multiline) {
       return {
         type: multiline ? 'textarea' : 'textFormField',
@@ -959,7 +987,7 @@
         }
       };
     }
-    
+
     function eventTypeButton(type) {
       const active = calendarState.draft.type === type;
       const category = calendarState.categories[type] || calendarState.categories.task;
@@ -983,7 +1011,7 @@
         ]
       };
     }
-    
+
     function repeatRow() {
       return optionRow([
         repeatButton('none'),
@@ -992,7 +1020,7 @@
         repeatButton('monthly')
       ]);
     }
-    
+
     function repeatButton(value) {
       const active = calendarState.draft.recurrence === value;
       return chipButton(
@@ -1002,7 +1030,7 @@
         { value }
       );
     }
-    
+
     function reminderRow() {
       return optionRow([
         chipButton(t('calendar.reminder'), calendarState.draft.reminderEnabled, 'handleToggleReminder', { value: !calendarState.draft.reminderEnabled }),
@@ -1011,7 +1039,7 @@
         chipButton('30m', calendarState.draft.reminderMinutes === 30, 'handleChangeReminderMinutes', { value: 30 })
       ]);
     }
-    
+
     function chipButton(label, active, handler, props) {
       return {
         type: 'expanded',
@@ -1031,14 +1059,14 @@
         ]
       };
     }
-    
+
     function optionRow(children) {
       return {
         type: 'row',
         children
       };
     }
-    
+
     function actionButton(label, handler, props) {
       return {
         type: 'expanded',
@@ -1051,7 +1079,7 @@
         ]
       };
     }
-    
+
     function dangerButton(label, handler, props) {
       return {
         type: 'expanded',
@@ -1070,7 +1098,7 @@
         ]
       };
     }
-    
+
     function moduleTabs() {
       const modules = ['schedule', 'approval', 'task', 'contacts', 'notifications'];
       return {
@@ -1084,7 +1112,7 @@
         ]
       };
     }
-    
+
     function moduleTab(module) {
       const active = calendarState.activeModule === module;
       return {
@@ -1107,7 +1135,7 @@
         ]
       };
     }
-    
+
     function modulePanel() {
       if (calendarState.activeModule === 'approval') {
         return approvalPanel();
@@ -1123,7 +1151,7 @@
       }
       return schedulePanel();
     }
-    
+
     function schedulePanel() {
       return {
         type: 'card',
@@ -1133,7 +1161,7 @@
         ]
       };
     }
-    
+
     function approvalPanel() {
       return listPanel(
         t('approval.title'),
@@ -1153,7 +1181,7 @@
         t('approval.empty')
       );
     }
-    
+
     function taskPanel() {
       return listPanel(
         t('task.title'),
@@ -1173,7 +1201,7 @@
         t('task.empty')
       );
     }
-    
+
     function contactPanel() {
       const items = (calendarState.draft.attendees || []).map((name, index) => ({
         id: calendarState.draft.attendeeIds[index] || name,
@@ -1190,7 +1218,7 @@
         t('contact.empty')
       );
     }
-    
+
     function notificationPanel() {
       return listPanel(
         t('notification.title'),
@@ -1202,7 +1230,7 @@
         t('notification.empty')
       );
     }
-    
+
     function listPanel(title, items, renderItem, emptyText) {
       return {
         type: 'card',
@@ -1221,7 +1249,7 @@
         ]
       };
     }
-    
+
     function approvalStatus(status) {
       if (status === 'approved') {
         return t('approval.status.approved');
@@ -1231,7 +1259,7 @@
       }
       return t('approval.status.pending');
     }
-    
+
     exports["renderCalendarPage"] = renderCalendarPage;
   });
 
@@ -1253,7 +1281,7 @@
         ]
       };
     }
-    
+
     exports["renderTodayCard"] = renderTodayCard;
   });
 
@@ -1263,6 +1291,15 @@
         return null;
       }
       return invokeHost('toast.show', { message });
+    }
+    function showPicker(type, options = {}) {
+      if (typeof invokeHost !== 'function') {
+        return null;
+      }
+      return invokeHost('picker.show', {
+        type,
+        ...options
+      });
     }
     function pickContacts(selectedIds) {
       if (typeof invokeHost !== 'function') {
@@ -1289,8 +1326,9 @@
       }
       return invokeHost('approval.submit', payload || {});
     }
-    
+
     exports["showToast"] = showToast;
+    exports["showPicker"] = showPicker;
     exports["pickContacts"] = pickContacts;
     exports["sendNotification"] = sendNotification;
     exports["submitApproval"] = submitApproval;
@@ -1298,7 +1336,7 @@
 
   define("src/controllers/calendar_handlers.js", function(module, exports, require) {
     const { calendarState, cloneEvent, createDraft } = require("src/state/calendar_state.js");
-    const { pickContacts, sendNotification, showToast, submitApproval } = require("src/services/host_api.js");
+    const { pickContacts, sendNotification, showPicker, showToast, submitApproval } = require("src/services/host_api.js");
     const { parseDate } = require("src/utils/date.js");
     const { renderCalendarPage } = require("src/ui/pages/calendar_page.js");
     const { t, toggleLocale } = require("src/i18n.js");
@@ -1407,6 +1445,36 @@
           attendees: items.map(item => item.name),
           attendeeIds: items.map(item => item.id)
         };
+        return fullUpdate();
+      });
+    }
+    function handlePickDateTime(state) {
+      const field = state && state.props ? state.props.field : null;
+      if (!field || (field !== 'startTime' && field !== 'endTime')) {
+        return fullUpdate();
+      }
+
+      const currentValue = calendarState.draft[field];
+      const initialValue = currentValue ? new Date(currentValue).toISOString() : new Date().toISOString();
+
+      const result = showPicker('datetime', { initialValue });
+
+      if (!result) {
+        showToast(t('calendar.pickerNotAvailable'));
+        return fullUpdate();
+      }
+
+      return Promise.resolve(result).then(data => {
+        if (data && data.data && !data.data.cancelled && data.data.value) {
+          calendarState.draft = {
+            ...calendarState.draft,
+            [field]: data.data.value
+          };
+          showToast(t('calendar.timeUpdated'));
+        }
+        return fullUpdate();
+      }).catch(err => {
+        console.error('Picker error:', err);
         return fullUpdate();
       });
     }
@@ -1521,7 +1589,7 @@
       }
       return fullUpdate();
     }
-    
+
     function syncDraftForSelectedDay() {
       if (calendarState.editorMode === 'edit' && calendarState.selectedEventId) {
         const event = calendarState.events.find(item => item.id === calendarState.selectedEventId);
@@ -1532,7 +1600,7 @@
       }
       calendarState.draft = createDraft(calendarState.selectedDate || new Date());
     }
-    
+
     function normalizeDraft(draft) {
       const base = calendarState.selectedDate || new Date();
       const start = parseDateTime(base, draft.startTime, 9, 0);
@@ -1558,12 +1626,12 @@
         taskStatus: draft.taskStatus || 'open'
       };
     }
-    
+
     function formatReminderTime(draft) {
       const start = new Date(draft.startTime || new Date());
       return `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')}`;
     }
-    
+
     function extractItems(payload) {
       if (!payload) {
         return [];
@@ -1577,7 +1645,7 @@
       }
       return [];
     }
-    
+
     function parseDateTime(baseDate, timeText, defaultHour, defaultMinute) {
       if (!timeText || typeof timeText !== 'string' || !timeText.includes(':')) {
         return new Date(
@@ -1611,14 +1679,14 @@
         0
       );
     }
-    
+
     function fullUpdate() {
       return {
         type: 'full',
         schema: renderCalendarPage()
       };
     }
-    
+
     exports["handleGoToday"] = handleGoToday;
     exports["handlePreviousMonth"] = handlePreviousMonth;
     exports["handleNextMonth"] = handleNextMonth;
@@ -1628,6 +1696,7 @@
     exports["handleSwitchModule"] = handleSwitchModule;
     exports["handleEditorChange"] = handleEditorChange;
     exports["handlePickContacts"] = handlePickContacts;
+    exports["handlePickDateTime"] = handlePickDateTime;
     exports["handleSaveEvent"] = handleSaveEvent;
     exports["handleDeleteEvent"] = handleDeleteEvent;
     exports["handleToggleRepeat"] = handleToggleRepeat;
@@ -1643,7 +1712,7 @@
     const { ensureCalendarData } = require("src/state/calendar_state.js");
     const { renderCalendarPage } = require("src/ui/pages/calendar_page.js");
     const { renderTodayCard } = require("src/ui/cards/today_card.js");
-    const { handleApprovalAction, handleChangeReminderMinutes, handleCreateEvent, handleDateClick, handleDeleteEvent, handleEditorChange, handleEventDetail, handleFilter, handleGoToday, handleNextMonth, handlePickContacts, handlePreviousMonth, handleSaveEvent, handleSwitchModule, handleTaskAction, handleToggleReminder, handleToggleRepeat, handleToggleLocale } = require("src/controllers/calendar_handlers.js");
+    const { handleApprovalAction, handleChangeReminderMinutes, handleCreateEvent, handleDateClick, handleDeleteEvent, handleEditorChange, handleEventDetail, handleFilter, handleGoToday, handleNextMonth, handlePickContacts, handlePickDateTime, handlePreviousMonth, handleSaveEvent, handleSwitchModule, handleTaskAction, handleToggleReminder, handleToggleRepeat, handleToggleLocale } = require("src/controllers/calendar_handlers.js");
     exports["handleApprovalAction"] = handleApprovalAction;
     exports["handleChangeReminderMinutes"] = handleChangeReminderMinutes;
     exports["handleCreateEvent"] = handleCreateEvent;
@@ -1655,6 +1724,7 @@
     exports["handleGoToday"] = handleGoToday;
     exports["handleNextMonth"] = handleNextMonth;
     exports["handlePickContacts"] = handlePickContacts;
+    exports["handlePickDateTime"] = handlePickDateTime;
     exports["handlePreviousMonth"] = handlePreviousMonth;
     exports["handleSaveEvent"] = handleSaveEvent;
     exports["handleSwitchModule"] = handleSwitchModule;
@@ -1674,7 +1744,7 @@
       ensureCalendarData();
       return renderTodayCard(context);
     }
-    
+
     exports["onActivate"] = onActivate;
     exports["onDeactivate"] = onDeactivate;
     exports["renderPage"] = renderPage;
@@ -1682,7 +1752,7 @@
   });
 
   const entry = require("src/index.js");
-  for (const name of ["onActivate", "onDeactivate", "renderPage", "renderCard", "handleApprovalAction", "handleChangeReminderMinutes", "handleCreateEvent", "handleDateClick", "handleDeleteEvent", "handleEditorChange", "handleEventDetail", "handleFilter", "handleGoToday", "handleNextMonth", "handlePickContacts", "handlePreviousMonth", "handleSaveEvent", "handleSwitchModule", "handleTaskAction", "handleToggleReminder", "handleToggleRepeat", "handleToggleLocale"]) {
+  for (const name of ["onActivate", "onDeactivate", "renderPage", "renderCard", "handleApprovalAction", "handleChangeReminderMinutes", "handleCreateEvent", "handleDateClick", "handleDeleteEvent", "handleEditorChange", "handleEventDetail", "handleFilter", "handleGoToday", "handleNextMonth", "handlePickContacts", "handlePickDateTime", "handlePreviousMonth", "handleSaveEvent", "handleSwitchModule", "handleTaskAction", "handleToggleReminder", "handleToggleRepeat", "handleToggleLocale"]) {
     if (typeof entry[name] === 'function') {
       globalThis[name] = entry[name];
     }

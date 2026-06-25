@@ -57,8 +57,8 @@ function editorPanel() {
       text(t('calendar.editorSubtitle'), 12, '#6B7280', '400'),
       formField('title', t('calendar.fieldTitle'), draft.title),
       formField('location', t('calendar.fieldLocation'), draft.location),
-      formField('startTime', t('calendar.fieldStartTime'), formatTime(new Date(draft.startTime))),
-      formField('endTime', t('calendar.fieldEndTime'), formatTime(new Date(draft.endTime))),
+      timePickerField('startTime', t('calendar.fieldStartTime'), formatTime(new Date(draft.startTime))),
+      timePickerField('endTime', t('calendar.fieldEndTime'), formatTime(new Date(draft.endTime))),
       formField('notes', t('calendar.fieldNotes'), draft.notes, true),
       optionRow([
         eventTypeButton('meeting'),
@@ -79,6 +79,30 @@ function editorPanel() {
           actionButton(t('calendar.save'), 'handleSaveEvent'),
           sizedBox(8, 0),
           dangerButton(t('calendar.delete'), 'handleDeleteEvent', { id: draft.id })
+        ]
+      }
+    ]
+  };
+}
+
+function timePickerField(field, label, value) {
+  return {
+    type: 'container',
+    style: {
+      backgroundColor: '#F9FAFB',
+      borderRadius: 8,
+      padding: '12,12,12,12',
+      margin: '8,0,8,0'
+    },
+    events: { onTap: 'handlePickDateTime' },
+    props: { field },
+    children: [
+      {
+        type: 'column',
+        props: { crossAxisAlignment: 'start', spacing: 4 },
+        children: [
+          text(label, 12, '#6B7280', '500'),
+          text(value || '--:--', 14, '#111827', '400')
         ]
       }
     ]
