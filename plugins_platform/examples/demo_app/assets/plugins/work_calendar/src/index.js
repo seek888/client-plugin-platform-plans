@@ -13,6 +13,7 @@ export {
   handleGoToday,
   handleNextMonth,
   handlePickContacts,
+  handlePickDateTime,
   handlePreviousMonth,
   handleSaveEvent,
   handleSwitchModule,

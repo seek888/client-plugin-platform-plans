@@ -16,8 +16,8 @@
   "engine": {
     "runtime": "quickjs",
     "bundle": "dist/bundle.js",
-    "bundleHash": "fb1986f329f3bd21fb44a12fef306ca69c4986c5a0d10303067d2e3088c336d4",
-    "bundleSize": 61252,
+    "bundleHash": "38d6a6a5cb55550838bf5bdeeac67e7945bf0fedb0c31199a41991c05700f13f",
+    "bundleSize": 63300,
     "entryFunction": "onActivate",
     "memoryLimitMb": 16,
     "executionTimeoutMs": 5000,

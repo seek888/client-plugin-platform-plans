@@ -51,9 +51,7 @@ Map<String, dynamic> _deepJsonMap(Map<String, dynamic> value) {
 
 /// 事件处理器签名。
 typedef STACEventHandler = Future<STACUpdate?> Function(
-  String eventName,
-  Map<String, dynamic> params,
-);
+    String eventName, Map<String, dynamic> params);
 
 /// 表单 Key。
 class STACFormKey {
@@ -288,8 +286,8 @@ Widget _buildNodeCore(
       return Stack(children: children);
     case STACComponentTypes.expanded:
       return Expanded(
-          child:
-              children.isNotEmpty ? children.first : const SizedBox.shrink());
+        child: children.isNotEmpty ? children.first : const SizedBox.shrink(),
+      );
     case STACComponentTypes.sizedBox:
       return SizedBox(
         width: _toDouble(props['width']),
@@ -315,7 +313,11 @@ Widget _buildNodeCore(
     case STACComponentTypes.checkbox:
       return _FormCheckboxField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.checkboxGroup:
-      return _FormCheckboxGroupField(node: node, props: props, formKey: formKey);
+      return _FormCheckboxGroupField(
+        node: node,
+        props: props,
+        formKey: formKey,
+      );
     case STACComponentTypes.radio:
       return _FormRadioField(node: node, props: props, formKey: formKey);
     case STACComponentTypes.radioGroup:
@@ -478,8 +480,11 @@ Widget _buildRow(List<Widget> children, Map<String, dynamic> props) {
     mainAxisAlignment: _mainAxisAlignment(props['mainAxisAlignment']),
     crossAxisAlignment: _crossAxisAlignment(props['crossAxisAlignment']) ??
         CrossAxisAlignment.center,
-    children:
-        _withSpacing(children, _toDouble(props['spacing']), horizontal: true),
+    children: _withSpacing(
+      children,
+      _toDouble(props['spacing']),
+      horizontal: true,
+    ),
   );
 }
 
@@ -510,10 +515,7 @@ Widget _buildImage(Map<String, dynamic> props) {
   return SizedBox(
     width: _toDouble(props['width']),
     height: _toDouble(props['height']),
-    child: FittedBox(
-      fit: _boxFit(props['fit']) ?? BoxFit.cover,
-      child: image,
-    ),
+    child: FittedBox(fit: _boxFit(props['fit']) ?? BoxFit.cover, child: image),
   );
 }
 
@@ -577,8 +579,11 @@ class _FormDropdownFieldState extends State<_FormDropdownField> {
   void initState() {
     super.initState();
     final id = widget.node['id']?.toString();
-    final initial =
-        _initialFormValue(widget.node, widget.props, widget.formKey);
+    final initial = _initialFormValue(
+      widget.node,
+      widget.props,
+      widget.formKey,
+    );
     _value = initial?.toString();
     if (id != null && _value != null) {
       widget.formKey?.setValue(id, _value);
@@ -638,8 +643,9 @@ class _FormCheckboxFieldState extends State<_FormCheckboxField> {
   void initState() {
     super.initState();
     final id = widget.node['id']?.toString();
-    _value =
-        _toBool(_initialFormValue(widget.node, widget.props, widget.formKey));
+    _value = _toBool(
+      _initialFormValue(widget.node, widget.props, widget.formKey),
+    );
     if (id != null) {
       widget.formKey?.setValue(id, _value);
     }
@@ -690,9 +696,14 @@ class _FormCheckboxGroupFieldState extends State<_FormCheckboxGroupField> {
   void initState() {
     super.initState();
     final id = widget.node['id']?.toString();
-    final initial =
-        _initialFormValue(widget.node, widget.props, widget.formKey);
+    final initial = _initialFormValue(
+      widget.node,
+      widget.props,
+      widget.formKey,
+    );
     if (initial is List) {
+      _selectedValues = initial.map((e) => e.toString()).toList();
+    } else if (initial is Set) {
       _selectedValues = initial.map((e) => e.toString()).toList();
     } else if (initial is String && initial.isNotEmpty) {
       _selectedValues = [initial];
@@ -766,8 +777,9 @@ class _FormSwitchFieldState extends State<_FormSwitchField> {
   void initState() {
     super.initState();
     final id = widget.node['id']?.toString();
-    _value =
-        _toBool(_initialFormValue(widget.node, widget.props, widget.formKey));
+    _value = _toBool(
+      _initialFormValue(widget.node, widget.props, widget.formKey),
+    );
     if (id != null) {
       widget.formKey?.setValue(id, _value);
     }
@@ -868,8 +880,11 @@ class _FormRadioGroupFieldState extends State<_FormRadioGroupField> {
   void initState() {
     super.initState();
     final id = widget.node['id']?.toString();
-    final initial =
-        _initialFormValue(widget.node, widget.props, widget.formKey);
+    final initial = _initialFormValue(
+      widget.node,
+      widget.props,
+      widget.formKey,
+    );
     _value = initial?.toString();
     if (id != null && _value != null) {
       widget.formKey?.setValue(id, _value);
@@ -932,7 +947,8 @@ class _FormSliderFieldState extends State<_FormSliderField> {
     super.initState();
     final id = widget.node['id']?.toString();
     _value = _toDouble(
-            _initialFormValue(widget.node, widget.props, widget.formKey)) ??
+          _initialFormValue(widget.node, widget.props, widget.formKey),
+        ) ??
         _toDouble(widget.props['min']) ??
         0;
     if (id != null) {
@@ -1031,14 +1047,16 @@ VoidCallback? _buildTapHandler(
   if (handler == null) return null;
 
   return () {
-    unawaited(onEvent?.call(handler, {
-      'nodeId': node['id'],
-      'eventType': eventName,
-      'handler': handler,
-      'props': Map<String, dynamic>.from(node['props'] as Map? ?? const {}),
-      'currentData': data,
-      'form': formKey?.getValues() ?? const <String, dynamic>{},
-    }));
+    unawaited(
+      onEvent?.call(handler, {
+        'nodeId': node['id'],
+        'eventType': eventName,
+        'handler': handler,
+        'props': Map<String, dynamic>.from(node['props'] as Map? ?? const {}),
+        'currentData': data,
+        'form': formKey?.getValues() ?? const <String, dynamic>{},
+      }),
+    );
   };
 }
 
@@ -1059,8 +1077,9 @@ List<Widget> _withSpacing(
     height: horizontal ? 0 : spacing,
   );
   return children
-      .expandIndexed((index, child) =>
-          index == children.length - 1 ? [child] : [child, gap])
+      .expandIndexed(
+        (index, child) => index == children.length - 1 ? [child] : [child, gap],
+      )
       .toList(growable: false);
 }
 
@@ -1103,8 +1122,10 @@ Widget _applyNodeStyle(Widget child, Map<String, dynamic> style) {
   }
 
   if (style['onTap'] != null) {
-    result =
-        GestureDetector(onTap: style['onTap'] as VoidCallback?, child: result);
+    result = GestureDetector(
+      onTap: style['onTap'] as VoidCallback?,
+      child: result,
+    );
   }
 
   return result;
@@ -1312,12 +1333,7 @@ EdgeInsetsGeometry? _edgeInsets(dynamic value) {
         .map((part) => double.tryParse(part.trim()))
         .toList(growable: false);
     if (parts.length == 4 && !parts.any((part) => part == null)) {
-      return EdgeInsets.fromLTRB(
-        parts[0]!,
-        parts[1]!,
-        parts[2]!,
-        parts[3]!,
-      );
+      return EdgeInsets.fromLTRB(parts[0]!, parts[1]!, parts[2]!, parts[3]!);
     }
   }
   return null;

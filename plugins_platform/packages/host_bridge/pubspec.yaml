@@ -11,6 +11,8 @@ dependencies:
     sdk: flutter
   core:
     path: ../core
+  stac_renderer:
+    path: ../stac_renderer
   http: ^1.2.2
   riverpod: ^2.4.9
   shared_preferences: ^2.2.2

@@ -30,6 +30,7 @@ RUNTIME_EXPORTS = [
     "handleGoToday",
     "handleNextMonth",
     "handlePickContacts",
+    "handlePickDateTime",
     "handlePreviousMonth",
     "handleSaveEvent",
     "handleSwitchModule",
@@ -174,7 +175,7 @@ def render_bundle(modules: dict[str, str]) -> str:
     for module_id, source in modules.items():
         lines.append(f"  define({json.dumps(module_id)}, function(module, exports, require) {{")
         for source_line in source.splitlines():
-            lines.append(f"    {source_line}")
+            lines.append(f"    {source_line}".rstrip())
         lines.append("  });")
         lines.append("")
 

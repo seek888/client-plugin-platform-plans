@@ -625,6 +625,8 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 
 下拉选择器。
 
+**实现状态**: ✅ 已实现
+
 **Props**:
 
 ```json
@@ -666,6 +668,8 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 #### checkboxGroup
 
 复选框组（多选）。
+
+**实现状态**: ✅ 已实现
 
 **Props**:
 
@@ -729,6 +733,8 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 
 单选按钮组。
 
+**实现状态**: ✅ 已实现
+
 **Props**:
 
 ```json
@@ -744,7 +750,7 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 
 **事件**:
 
-- `onChanged`: 选中状态改变时触发
+- `onChanged`: 选择改变时触发
 
 **示例**:
 
@@ -772,6 +778,8 @@ STAC (Schema-based Type-safe Adaptive Components) 是插件平台的声明式 UI
 #### switch
 
 开关组件。
+
+**实现状态**: ✅ 已实现
 
 **Props**:
 
