@@ -11,7 +11,8 @@ dependencies:
     sdk: flutter
   core:
     path: ../core
-  quickjs_engine: ^0.1.1
+  quickjs_engine:
+    path: ../../third_party/quickjs_engine
   collection: ^1.18.0
 
 dev_dependencies:
