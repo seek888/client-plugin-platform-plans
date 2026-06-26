@@ -867,14 +867,9 @@ export function createEvent(eventData) {
 
 ### 现有插件参考
 
-在 `examples/demo_app/assets/plugins/` 目录下有两个完整的插件实现：
+在 `examples/demo_app/assets/plugins/` 目录下有完整的插件实现：
 
-1. **ai_news_daily**
-   - 简单的数据提供插件
-   - RSS feed 集成
-   - 网络请求和数据映射
-
-2. **work_calendar**
+1. **work_calendar**
    - 复杂的业务插件
    - 完整的 CRUD 操作
    - 多模块架构

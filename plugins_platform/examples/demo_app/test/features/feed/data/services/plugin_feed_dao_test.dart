@@ -23,9 +23,9 @@ void main() {
       () async {
         await feedDao.insertFeed(
           FeedsTableCompanion(
-            id: const Value('legacy-ai-news'),
-            url: const Value('plugin://com.rss.ai_news_daily/ai-news'),
-            title: const Value('AI 资讯快报'),
+            id: const Value('legacy-plugin-feed'),
+            url: const Value('plugin://com.example.feed_provider/daily-feed'),
+            title: const Value('插件订阅源'),
             sourceType: const Value('plugin'),
             createdAt: Value(DateTime(2026)),
             updatedAt: Value(DateTime(2026)),
@@ -33,12 +33,12 @@ void main() {
         );
 
         final feeds = await feedDao.getPluginFeedsByIdentity(
-          'com.rss.ai_news_daily',
-          'ai-news',
+          'com.example.feed_provider',
+          'daily-feed',
         );
 
         expect(feeds, hasLength(1));
-        expect(feeds.single.id, 'legacy-ai-news');
+        expect(feeds.single.id, 'legacy-plugin-feed');
       },
     );
 
@@ -46,8 +46,8 @@ void main() {
       await feedDao.insertFeed(
         FeedsTableCompanion(
           id: const Value('first'),
-          url: const Value('plugin://com.rss.ai_news_daily/ai-news'),
-          title: const Value('AI 资讯快报'),
+          url: const Value('plugin://com.example.feed_provider/daily-feed'),
+          title: const Value('插件订阅源'),
           sourceType: const Value('plugin'),
           createdAt: Value(DateTime(2026)),
           updatedAt: Value(DateTime(2026)),
@@ -56,19 +56,19 @@ void main() {
       await feedDao.insertFeed(
         FeedsTableCompanion(
           id: const Value('second'),
-          url: const Value('plugin://com.rss.ai_news_daily/ai-news'),
-          title: const Value('AI 资讯快报'),
+          url: const Value('plugin://com.example.feed_provider/daily-feed'),
+          title: const Value('插件订阅源'),
           sourceType: const Value('plugin'),
-          pluginId: const Value('com.rss.ai_news_daily'),
-          pluginFeedKey: const Value('ai-news'),
+          pluginId: const Value('com.example.feed_provider'),
+          pluginFeedKey: const Value('daily-feed'),
           createdAt: Value(DateTime(2026, 1, 2)),
           updatedAt: Value(DateTime(2026, 1, 2)),
         ),
       );
 
       final feeds = await feedDao.getPluginFeedsByIdentity(
-        'com.rss.ai_news_daily',
-        'ai-news',
+        'com.example.feed_provider',
+        'daily-feed',
       );
 
       expect(feeds.map((feed) => feed.id), ['first', 'second']);

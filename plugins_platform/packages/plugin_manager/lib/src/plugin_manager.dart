@@ -61,7 +61,7 @@ class PluginManager {
     if (!_pluginsDir!.existsSync()) return;
 
     final manifestFiles = _pluginsDir!
-        .listSync()
+        .listSync(recursive: true)
         .whereType<File>()
         .where((f) => f.path.endsWith('/manifest.json'));
 

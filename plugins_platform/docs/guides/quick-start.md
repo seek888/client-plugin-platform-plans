@@ -479,7 +479,7 @@ flutter run
 1. 查看 [示例集合](examples.md) 了解更多场景
 2. 探索更多 STAC 组件（textField、列表、图片等）
 3. 尝试调用更多宿主能力（网络请求、通知等）
-4. 研究现有插件的源代码（`ai_news_daily`、`work_calendar`）
+4. 研究现有插件的源代码（`work_calendar`）
 
 ## 完整目录结构
 

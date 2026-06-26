@@ -6,6 +6,7 @@ library;
 
 export 'src/plugin_manager.dart';
 export 'src/plugin_renderer.dart';
+export 'src/plugin_package_installer.dart';
 export 'src/advanced_features.dart';
 export 'src/bundle_update.dart';
 export 'src/plugin_collaboration.dart';
