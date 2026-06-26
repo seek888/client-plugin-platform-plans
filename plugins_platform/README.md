@@ -9,7 +9,7 @@ Plugins Platform 是一个 Flutter 客户端插件平台，用于在宿主应用
 - **Manifest 契约**：使用 `manifest.json` 描述插件元数据、Bundle、权限、能力、STAC 组件和性能预算。
 - **Host Bridge**：通过能力注册表和权限校验，将宿主能力安全暴露给插件。
 - **STAC SDUI**：插件返回 Schema，宿主渲染为 Flutter Widget。
-- **示例宿主**：`examples/demo_app` 内置 `ai_news_daily` 与 `work_calendar` 示例插件。
+- **示例宿主**：`examples/demo_app` 内置 `work_calendar` 示例插件，并支持从本地导入插件安装包。
 
 ## 架构概览
 
@@ -103,7 +103,6 @@ Start with [Quick Start](docs/guides/quick-start.md) to create a basic JS plugin
 
 Example plugins:
 
-- `examples/demo_app/assets/plugins/ai_news_daily`
 - `examples/demo_app/assets/plugins/work_calendar`
 
 When editing plugin source under `src/`, run the plugin build script so `dist/bundle.js` and Manifest bundle metadata stay in sync.

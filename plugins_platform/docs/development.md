@@ -53,7 +53,6 @@ dart run build_runner build --delete-conflicting-outputs
 
 示例插件位于：
 
-- `examples/demo_app/assets/plugins/ai_news_daily`
 - `examples/demo_app/assets/plugins/work_calendar`
 
 修改插件 `src/` 后，需要运行对应插件的构建脚本：

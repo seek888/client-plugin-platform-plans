@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -10,8 +12,6 @@ class PluginExtensionsPage extends ConsumerStatefulWidget {
 
   static const _workCalendarPluginId = 'com.company.work_calendar';
   static const _workCalendarAssetPath = 'assets/plugins/work_calendar';
-  static const _aiNewsPluginId = 'com.rss.ai_news_daily';
-  static const _aiNewsAssetPath = 'assets/plugins/ai_news_daily';
 
   @override
   ConsumerState<PluginExtensionsPage> createState() =>
@@ -19,6 +19,8 @@ class PluginExtensionsPage extends ConsumerStatefulWidget {
 }
 
 class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
+  bool _isImportingPlugin = false;
+
   @override
   void initState() {
     super.initState();
@@ -37,7 +39,12 @@ class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
       plugins,
       PluginExtensionsPage._workCalendarPluginId,
     );
-    final aiNews = _findPlugin(plugins, PluginExtensionsPage._aiNewsPluginId);
+    final importedPlugins = plugins
+        .where(
+          (plugin) =>
+              plugin.manifest.id != PluginExtensionsPage._workCalendarPluginId,
+        )
+        .toList(growable: false);
     final activatedCount = plugins.where((plugin) => plugin.isActivated).length;
 
     return Scaffold(
@@ -53,6 +60,16 @@ class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
               _SummaryPanel(
                 installedCount: plugins.length,
                 activatedCount: activatedCount,
+              ),
+              const SizedBox(height: 12),
+              _LocalPluginImportPanel(
+                isImporting: _isImportingPlugin,
+                onImport: () => _installPluginPackage(context, ref),
+                onImportAndActivate: () => _installPluginPackage(
+                  context,
+                  ref,
+                  activateAfterInstall: true,
+                ),
               ),
               const SizedBox(height: 12),
               PluginLifecycleCard(
@@ -86,38 +103,27 @@ class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
                   title: '工作日历',
                 ),
               ),
-              const SizedBox(height: 12),
-              PluginLifecycleCard(
-                title: 'AI 资讯快报',
-                description: '启用后自动注入订阅源，并拉取 AI、大模型领域的日更资讯。',
-                icon: Icons.auto_awesome_outlined,
-                permissions: const ['网络请求', '本地存储', '订阅源注入'],
-                plugin: aiNews,
-                onInstall: () => _installAssetPlugin(
-                  context,
-                  ref,
-                  assetPath: PluginExtensionsPage._aiNewsAssetPath,
-                  successMessage: 'AI 资讯快报插件已安装',
+              for (final plugin in importedPlugins) ...[
+                const SizedBox(height: 12),
+                PluginLifecycleCard(
+                  title: plugin.manifest.name,
+                  description:
+                      plugin.manifest.description ?? plugin.manifest.id,
+                  icon: Icons.extension_outlined,
+                  permissions: plugin.manifest.permissions,
+                  plugin: plugin,
+                  onInstall: () {},
+                  onActivate: () =>
+                      _activatePlugin(context, ref, plugin.manifest.id),
+                  onInstallAndActivate: () {},
+                  onOpen: () => _openPluginPage(
+                    context,
+                    ref,
+                    pluginId: plugin.manifest.id,
+                    title: plugin.manifest.name,
+                  ),
                 ),
-                onActivate: () => _activatePlugin(
-                  context,
-                  ref,
-                  PluginExtensionsPage._aiNewsPluginId,
-                ),
-                onInstallAndActivate: () => _installAndActivateAssetPlugin(
-                  context,
-                  ref,
-                  assetPath: PluginExtensionsPage._aiNewsAssetPath,
-                  pluginId: PluginExtensionsPage._aiNewsPluginId,
-                  title: 'AI 资讯快报',
-                ),
-                onOpen: () => _openPluginPage(
-                  context,
-                  ref,
-                  pluginId: PluginExtensionsPage._aiNewsPluginId,
-                  title: 'AI 资讯快报',
-                ),
-              ),
+              ],
               const SizedBox(height: 16),
               _CapabilityPanel(plugins: plugins),
             ],
@@ -168,6 +174,63 @@ class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
           error: error,
           stackTrace: stackTrace,
         );
+      }
+    }
+  }
+
+  Future<void> _installPluginPackage(
+    BuildContext context,
+    WidgetRef ref, {
+    bool activateAfterInstall = false,
+  }) async {
+    if (_isImportingPlugin) return;
+    setState(() => _isImportingPlugin = true);
+    try {
+      _showSnack(context, '请选择本地插件安装包');
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['zip'],
+        withData: false,
+      );
+      final path = result?.files.single.path;
+      if (path == null) {
+        if (context.mounted) {
+          _showSnack(context, '已取消导入');
+        }
+        return;
+      }
+
+      final manager = ref.read(pluginManagerProvider);
+      await manager.ready;
+      final installer = PluginPackageInstaller(manager);
+      final manifest = await installer.installFromFile(File(path));
+      if (activateAfterInstall) {
+        await manager.activate(manifest.id);
+      }
+
+      ref.read(pluginListProvider.notifier).state = manager.getAllPlugins();
+
+      if (context.mounted) {
+        _showSnack(
+          context,
+          activateAfterInstall
+              ? '${manifest.name} 已安装并激活'
+              : '${manifest.name} 已安装',
+        );
+      }
+    } catch (error, stackTrace) {
+      if (context.mounted) {
+        _showPluginErrorLog(
+          context,
+          title: activateAfterInstall ? '安装并激活失败' : '安装失败',
+          pluginId: 'local-plugin-package',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isImportingPlugin = false);
       }
     }
   }
@@ -381,6 +444,95 @@ class _PluginExtensionsPageState extends ConsumerState<PluginExtensionsPage> {
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? Theme.of(context).colorScheme.error : null,
+      ),
+    );
+  }
+}
+
+class _LocalPluginImportPanel extends StatelessWidget {
+  const _LocalPluginImportPanel({
+    required this.isImporting,
+    required this.onImport,
+    required this.onImportAndActivate,
+  });
+
+  final bool isImporting;
+  final VoidCallback onImport;
+  final VoidCallback onImportAndActivate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 420;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.upload_file_outlined,
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('本地导入插件', style: theme.textTheme.titleMedium),
+                          const SizedBox(height: 4),
+                          Text(
+                            '选择本地 .zip 插件安装包，导入后可在下方管理。',
+                            style: theme.textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: isImporting ? null : onImportAndActivate,
+                      icon: const Icon(Icons.flash_on_outlined),
+                      label: Text(
+                        isImporting
+                            ? '导入中'
+                            : isNarrow
+                            ? '导入激活'
+                            : '导入并激活',
+                      ),
+                    ),
+                    FilledButton.tonalIcon(
+                      onPressed: isImporting ? null : onImport,
+                      icon: const Icon(Icons.file_open_outlined),
+                      label: const Text('导入'),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

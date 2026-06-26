@@ -52,7 +52,6 @@ plugins_platform/
 ├── examples/                    # 示例和演示
 │   └── demo_app/               # Demo 应用
 │       └── assets/plugins/     # 插件示例
-│           ├── ai_news_daily/  # AI 资讯插件
 │           └── work_calendar/  # 工作日历插件
 ├── docs/                        # 文档目录
 │   └── guides/                 # 教程指南
@@ -129,7 +128,7 @@ flutter run -d <device-id>
 
 成功运行 Demo App 后，你应该能看到：
 - 应用主界面
-- 可用的插件列表（AI 资讯快报、工作日历）
+- 可用的插件列表和本地导入插件入口
 - 可以激活插件并查看其界面
 
 ## 插件目录结构

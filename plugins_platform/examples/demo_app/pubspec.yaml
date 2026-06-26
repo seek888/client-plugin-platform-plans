@@ -70,8 +70,6 @@ flutter:
     - assets/plugins/work_calendar/
     - assets/plugins/work_calendar/dist/
     - assets/plugins/work_calendar/i18n/
-    - assets/plugins/ai_news_daily/
-    - assets/plugins/ai_news_daily/dist/
 
 dependency_overrides:
   intl: ^0.20.2

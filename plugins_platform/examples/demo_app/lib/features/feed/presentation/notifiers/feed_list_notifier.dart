@@ -13,7 +13,6 @@ import 'package:rss_reader/features/feed/presentation/states/feed_list_state.dar
 import 'package:rss_reader/core/services/rss_parser_provider.dart';
 import 'package:rss_reader/features/notification/data/services/new_content_notifier.dart';
 import 'package:rss_reader/features/notification/presentation/providers/notification_provider.dart';
-import 'package:rss_reader/features/plugins/data/services/builtin_plugin_bootstrap.dart';
 import 'package:plugins_platform/plugins_platform.dart';
 
 part 'feed_list_notifier.g.dart';
@@ -27,11 +26,9 @@ FeedRepository feedRepository(Ref ref) {
   final rssParserService = ref.watch(rssParserServiceProvider);
   final pluginManager = ref.watch(pluginManagerProvider);
   final dataSourceManager = ref.watch(dataSourceManagerProvider);
-  final bootstrap = BuiltinPluginBootstrap(pluginManager: pluginManager);
   final pluginFeedDiscoveryService = PluginFeedDiscoveryService(
     pluginManager: pluginManager,
     feedDao: feedDao,
-    bootstrap: bootstrap,
   );
   return FeedRepositoryImpl(
     feedDao: feedDao,

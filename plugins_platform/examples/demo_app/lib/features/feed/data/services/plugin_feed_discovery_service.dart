@@ -2,7 +2,6 @@ import 'package:drift/drift.dart';
 import 'package:plugins_platform/plugins_platform.dart';
 import 'package:rss_reader/core/database/app_database.dart';
 import 'package:rss_reader/core/database/daos/feed_dao.dart';
-import 'package:rss_reader/features/plugins/data/services/builtin_plugin_bootstrap.dart';
 import 'package:uuid/uuid.dart';
 
 /// 插件订阅源发现服务
@@ -11,18 +10,15 @@ class PluginFeedDiscoveryService {
 
   final PluginManager _pluginManager;
   final FeedDao _feedDao;
-  final BuiltinPluginBootstrap _bootstrap;
   final Uuid _uuid;
   Future<void>? _syncInFlight;
 
   PluginFeedDiscoveryService({
     required PluginManager pluginManager,
     required FeedDao feedDao,
-    required BuiltinPluginBootstrap bootstrap,
     Uuid? uuid,
   }) : _pluginManager = pluginManager,
        _feedDao = feedDao,
-       _bootstrap = bootstrap,
        _uuid = uuid ?? const Uuid();
 
   Future<void> syncDiscoveredFeeds() async {
@@ -41,7 +37,6 @@ class PluginFeedDiscoveryService {
   }
 
   Future<void> _syncDiscoveredFeeds() async {
-    await _bootstrap.ensureInstalled();
     await _pluginManager.ready;
 
     final plugins = _pluginManager.getAllPlugins().where(
