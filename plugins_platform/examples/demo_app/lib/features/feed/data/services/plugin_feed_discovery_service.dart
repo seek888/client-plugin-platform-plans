@@ -13,28 +13,44 @@ class PluginFeedDiscoveryService {
   final FeedDao _feedDao;
   final BuiltinPluginBootstrap _bootstrap;
   final Uuid _uuid;
+  Future<void>? _syncInFlight;
 
   PluginFeedDiscoveryService({
     required PluginManager pluginManager,
     required FeedDao feedDao,
     required BuiltinPluginBootstrap bootstrap,
     Uuid? uuid,
-  })  : _pluginManager = pluginManager,
-        _feedDao = feedDao,
-        _bootstrap = bootstrap,
-        _uuid = uuid ?? const Uuid();
+  }) : _pluginManager = pluginManager,
+       _feedDao = feedDao,
+       _bootstrap = bootstrap,
+       _uuid = uuid ?? const Uuid();
 
   Future<void> syncDiscoveredFeeds() async {
+    final inFlight = _syncInFlight;
+    if (inFlight != null) return inFlight;
+
+    final sync = _syncDiscoveredFeeds();
+    _syncInFlight = sync;
+    try {
+      await sync;
+    } finally {
+      if (identical(_syncInFlight, sync)) {
+        _syncInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _syncDiscoveredFeeds() async {
     await _bootstrap.ensureInstalled();
     await _pluginManager.ready;
 
     final plugins = _pluginManager.getAllPlugins().where(
-          (plugin) =>
-              plugin.isActivated &&
-              plugin.manifest.capabilities.any(
-                (capability) => capability.id == providerCapability,
-              ),
-        );
+      (plugin) =>
+          plugin.isActivated &&
+          plugin.manifest.capabilities.any(
+            (capability) => capability.id == providerCapability,
+          ),
+    );
 
     for (final plugin in plugins) {
       final discovered = await _pluginManager.callPluginFunction(
@@ -44,7 +60,7 @@ class PluginFeedDiscoveryService {
       );
       final feeds = _extractFeeds(discovered);
       await _upsertDiscoveredFeeds(plugin.manifest.id, feeds);
-      await _cleanupDuplicateFeeds(plugin.manifest.id);
+      await _cleanupDuplicateFeeds(plugin.manifest.id, feeds);
     }
   }
 
@@ -55,12 +71,25 @@ class PluginFeedDiscoveryService {
     for (final feed in feeds) {
       final feedKey = feed['feedKey']?.toString();
       final title = feed['title']?.toString();
-      if (feedKey == null || feedKey.isEmpty || title == null || title.isEmpty) {
+      if (feedKey == null ||
+          feedKey.isEmpty ||
+          title == null ||
+          title.isEmpty) {
         continue;
       }
 
-      final existing = await _feedDao.getPluginFeed(pluginId, feedKey);
-      if (existing != null) {
+      final existingFeeds = await _feedDao.getPluginFeedsByIdentity(
+        pluginId,
+        feedKey,
+      );
+      if (existingFeeds.isNotEmpty) {
+        await _normalizeDiscoveredFeed(
+          keep: existingFeeds.first,
+          duplicates: existingFeeds.skip(1),
+          pluginId: pluginId,
+          feedKey: feedKey,
+          feed: feed,
+        );
         continue;
       }
 
@@ -86,18 +115,63 @@ class PluginFeedDiscoveryService {
     }
   }
 
-  Future<void> _cleanupDuplicateFeeds(String pluginId) async {
-    final pluginFeeds = await _feedDao.getPluginFeeds(pluginId);
-    final grouped = <String, List<FeedsTableData>>{};
-
-    for (final feed in pluginFeeds) {
-      final feedKey = feed.pluginFeedKey;
-      if (feedKey == null || feedKey.isEmpty) continue;
-      grouped.putIfAbsent(feedKey, () => []).add(feed);
+  Future<void> _normalizeDiscoveredFeed({
+    required FeedsTableData keep,
+    required Iterable<FeedsTableData> duplicates,
+    required String pluginId,
+    required String feedKey,
+    required Map<String, dynamic> feed,
+  }) async {
+    for (final duplicate in duplicates) {
+      await _feedDao.deleteFeed(duplicate.id);
     }
 
-    for (final entry in grouped.entries) {
-      final feeds = entry.value;
+    final title = feed['title']?.toString();
+    final now = DateTime.now();
+    await _feedDao.updateFeed(
+      FeedsTableCompanion(
+        id: Value(keep.id),
+        url: Value('plugin://$pluginId/$feedKey'),
+        title: Value(title == null || title.isEmpty ? keep.title : title),
+        description: Value(feed['description']?.toString() ?? keep.description),
+        iconUrl: Value(feed['iconUrl']?.toString() ?? keep.iconUrl),
+        link: Value(feed['link']?.toString() ?? keep.link),
+        categoryId: Value(keep.categoryId),
+        sortOrder: Value(keep.sortOrder),
+        unreadCount: Value(keep.unreadCount),
+        lastUpdated: Value(keep.lastUpdated),
+        lastFetched: Value(keep.lastFetched),
+        isEnabled: Value(keep.isEnabled),
+        isBlocked: Value(keep.isBlocked),
+        healthStatus: Value(keep.healthStatus),
+        failureCount: Value(keep.failureCount),
+        createdAt: Value(keep.createdAt),
+        updatedAt: Value(now),
+        sourceType: const Value('plugin'),
+        apiBaseUrl: const Value(null),
+        apiKey: const Value(null),
+        apiHeaders: const Value(null),
+        apiRemoteFeedId: const Value(null),
+        apiTimeout: const Value(30),
+        apiMaxRetries: const Value(3),
+        pluginId: Value(pluginId),
+        pluginFeedKey: Value(feedKey),
+        pluginProvider: Value(
+          feed['provider']?.toString() ?? providerCapability,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _cleanupDuplicateFeeds(
+    String pluginId,
+    List<Map<String, dynamic>> discoveredFeeds,
+  ) async {
+    for (final discoveredFeed in discoveredFeeds) {
+      final feedKey = discoveredFeed['feedKey']?.toString();
+      if (feedKey == null || feedKey.isEmpty) continue;
+
+      final feeds = await _feedDao.getPluginFeedsByIdentity(pluginId, feedKey);
       if (feeds.length <= 1) continue;
 
       final keep = feeds.first;
@@ -132,7 +206,7 @@ class PluginFeedDiscoveryService {
           apiTimeout: const Value(30),
           apiMaxRetries: const Value(3),
           pluginId: Value(pluginId),
-          pluginFeedKey: Value(entry.key),
+          pluginFeedKey: Value(feedKey),
           pluginProvider: const Value(providerCapability),
         ),
       );
@@ -144,7 +218,9 @@ class PluginFeedDiscoveryService {
     if (rawFeeds is! List) return const [];
     return rawFeeds
         .whereType<Map>()
-        .map((item) => item.map((key, value) => MapEntry(key.toString(), value)))
+        .map(
+          (item) => item.map((key, value) => MapEntry(key.toString(), value)),
+        )
         .toList(growable: false);
   }
 }

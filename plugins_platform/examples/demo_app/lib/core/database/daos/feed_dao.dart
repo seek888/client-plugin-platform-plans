@@ -62,8 +62,28 @@ class FeedDao extends DatabaseAccessor<AppDatabase> with _$FeedDaoMixin {
                 t.sourceType.equals('plugin') &
                 t.pluginId.equals(pluginId) &
                 t.pluginFeedKey.equals(feedKey),
-          ))
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)])
+          ..limit(1))
         .getSingleOrNull();
+  }
+
+  /// 根据插件源标识或旧版 URL 获取订阅源。
+  Future<List<FeedsTableData>> getPluginFeedsByIdentity(
+    String pluginId,
+    String feedKey,
+  ) {
+    final feedUrl = 'plugin://$pluginId/$feedKey';
+    return (select(feedsTable)
+          ..where(
+            (t) =>
+                t.sourceType.equals('plugin') &
+                ((t.pluginId.equals(pluginId) &
+                        t.pluginFeedKey.equals(feedKey)) |
+                    t.url.equals(feedUrl)),
+          )
+          ..orderBy([(t) => OrderingTerm.asc(t.createdAt)]))
+        .get();
   }
 
   /// 获取某个插件的所有订阅源
